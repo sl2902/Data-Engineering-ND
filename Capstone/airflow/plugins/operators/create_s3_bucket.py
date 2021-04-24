@@ -6,7 +6,7 @@ import os
 class CreateS3BucketOperator(BaseOperator):
     """
     Custom operator to create S3 buckets
-    :aws_credentials_id - AWS Credentials
+    :aws_credentials- AWS Credentials
     :s3_bucket - S3 bucket name
     :s3_key - Folder name under the bucket
     :region - AWS region where bucket is located
@@ -14,14 +14,14 @@ class CreateS3BucketOperator(BaseOperator):
     ui_color = '#358140'
     
     @apply_defaults
-    def __init__(self, aws_credentials_id, s3_bucket, region, *args, **kwargs):
+    def __init__(self, aws_credentials, s3_bucket, region, *args, **kwargs):
         super(CreateS3BucketOperator, self).__init__(*args, **kwargs)
-        self.aws_creds = aws_credentials_id
+        self.aws_creds = aws_credentials
         self.s3_bucket = s3_bucket
         self.region = region
     
     def execute(self, context):
-        path = os.path.join(self.s3_bucket, self.s3_key)
+        path = self.s3_bucket
         try:
             s3_hook = S3Hook(self.aws_creds)
         except Exception as e:

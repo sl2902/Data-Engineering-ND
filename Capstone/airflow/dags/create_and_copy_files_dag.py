@@ -38,7 +38,7 @@ with DAG(
         create_s3_bucket = CreateS3BucketOperator(
             task_id='Create_s3_bucket',
             dag=dag,
-            aws_credentials_id='aws_credentials',
+            aws_credentials='aws_credentials',
             s3_bucket=s3_bucket,
             region=aws_region,
         )
@@ -46,7 +46,7 @@ with DAG(
         copy_sas_files = CopyFilesToS3Operator(
             task_id='Copy_raw_sas_files',
             dag=dag,
-            aws_credentials_id='aws_credentials',
+            aws_credentials='aws_credentials',
             source_path=base_dir,
             file_ext='sas7bdat',
             s3_bucket=s3_bucket,
@@ -56,7 +56,7 @@ with DAG(
         copy_csv_files = CopyFilesToS3Operator(
             task_id='Copy_csv_files',
             dag=dag,
-            aws_credentials_id='aws_credentials',
+            aws_credentials='aws_credentials',
             source_path=base_dir,
             file_ext='csv',
             s3_bucket=s3_bucket,
@@ -66,7 +66,7 @@ with DAG(
         copy_data_dictionary = CopyFilesToS3Operator(
             task_id='Copy_data_dictionary',
             dag=dag,
-            aws_credentials_id='aws_credentials',
+            aws_credentials='aws_credentials',
             source_path=base_dir,
             file_ext='SAS',
             s3_bucket=s3_bucket,

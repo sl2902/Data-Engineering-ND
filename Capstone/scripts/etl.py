@@ -27,7 +27,7 @@ from pyspark.sql.types import (StructType as R,
 
 DATE_FMT = datetime.strftime(datetime.today(), '%Y%m%d')
 FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-CFG_FILE = r'/Users/home/Documents/Data Engineering ND/Capstone/config/etl_config.cfg'
+CFG_FILE = r'/Users/home/Documents/dend/Data-Engineering-ND/Capstone/config/etl_config.cfg'
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -419,24 +419,23 @@ def main():
         print('Configuration file is missing or cannot be read...')
         raise
 
-    LOG_DIR = config['LOCAL']['log_dir']
-    LOG_FILE = config['LOCAL']['log_file']
+    base_dir = config['LOCAL']['base_dir']
+    log_dir = os.path.join(base_dir, config['LOCAL']['log_dir'])
+    log_file = config['LOCAL']['log_file']
     print("Create log dir if it doesn't exist...")
-    pathlib.Path(LOG_DIR).mkdir(exist_ok=True)
-    file_handler = enable_logging(LOG_DIR, LOG_FILE)
+    pathlib.Path(log_dir).mkdir(exist_ok=True)
+    file_handler = enable_logging(log_dir, log_file)
     logger.addHandler(file_handler)
 
     logger.info('ETL parsing has started...')
     spark = create_spark_session()
     logger.info('Pyspark session created...')
 
-    
-    base_dir = config['LOCAL']['base_dir']
     path = config['LOCAL']['sas_data_dir']
     files = json.loads(config['LOCAL']['input_files'])
     airport_file = os.path.join(base_dir, config['LOCAL']['airports_file'])
     demographic_file = os.path.join(base_dir, config['LOCAL']['us_demographics_file'])
-    output_dir = config['LOCAL']['output_dir']
+    output_dir = os.path.join(base_dir, config['LOCAL']['output_dir'])
     logger.info("Create output dir if it doesn't exist...")
     pathlib.Path(output_dir).mkdir(exist_ok=True)
 
@@ -444,7 +443,7 @@ def main():
     dfs = []
     for file in files:
         df = spark.read.format('com.github.saurfang.sas.spark')\
-                    .load(os.path.join(path, file))
+                    .load(os.path.join(base_dir, path, file))
         dfs.append(df)
     logger.info(f'Read {len(files)} files successfully...')
     df = concat_df(*dfs)

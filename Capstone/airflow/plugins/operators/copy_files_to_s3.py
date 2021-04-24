@@ -14,7 +14,7 @@ class CopyFilesToS3Operator(BaseOperator):
     ui_color = '#7591f0'
     
     @apply_defaults
-    def __init__(self, aws_credentials_id, 
+    def __init__(self, aws_credentials, 
                  source_path,
                  file_ext, 
                  s3_bucket, 
