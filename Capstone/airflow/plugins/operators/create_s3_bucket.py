@@ -27,11 +27,11 @@ class CreateS3BucketOperator(BaseOperator):
         except Exception as e:
             self.log.error('Invalid AWS credentials...')
             raise
-        if s3.hook.check_for_bucket(bucket_name=path):
+        if s3_hook.check_for_bucket(bucket_name=path):
             self.log.info(f'{path} already exists...')
         else:
             try:
-                s3_hook.create_bucket(bucket_name=path, region=self.region)
+                s3_hook.create_bucket(bucket_name=path, region_name=self.region)
                 self.log.info(f'{path} has been created...')
             except Exception as e:
                 self.log.error('Bucket creation failed...')

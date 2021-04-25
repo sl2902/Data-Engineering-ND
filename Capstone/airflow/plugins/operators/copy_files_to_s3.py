@@ -10,6 +10,7 @@ class CopyFilesToS3Operator(BaseOperator):
     :source_path - Source file path on local system
     :s3_bucket - S3 bucket name
     :s3_key - Folder name under the bucket
+    :src_files - Optional list of files
     """
     ui_color = '#7591f0'
     
@@ -19,6 +20,7 @@ class CopyFilesToS3Operator(BaseOperator):
                  file_ext, 
                  s3_bucket, 
                  s3_key,
+                 src_files=None,
                  *args,
                  **kwargs):
         super(CopyFilesToS3Operator, self).__init__(*args, **kwargs)
@@ -27,6 +29,7 @@ class CopyFilesToS3Operator(BaseOperator):
         self.file_ext = file_ext
         self.s3_bucket = s3_bucket
         self.s3_key = s3_key
+        self.src_files = src_files
     
     def execute(self, context):
         try:
@@ -34,15 +37,26 @@ class CopyFilesToS3Operator(BaseOperator):
         except Exception as e:
             self.log.error('Invalid AWS credentials...')
             raise
-        for file in os.listdir(self.source_path):
+        for path, _, files in os.walk(self.source_path):
             try:
-                if file.endswith(self.file_ext):
-                    # file = file.split('/')[-1]
-                    self.log.info(f'Copied file {file} into S3 bucket...')
-                    s3_hook.load_file(filename=file, bucket_name=s3.bucket,
-                             key=self.s3_key, replace=True)
-                else:
-                    self.log.info(f'File {file} doesnt end with extension {self.file_ext}')
+                for _file in files:
+                    # Added this condition to limit
+                    # the SAS files to only 2 files
+                    if self.src_files is not None:
+                        if _file in self.src_files:
+                            self.log.info(f'Copied file {_file} into S3 bucket...')
+                            s3_hook.load_file(filename=os.path.join(path, _file), bucket_name=self.s3.bucket,
+                                    key=self.s3_key, replace=True)
+                        else:
+                            self.log.info(f'File {_file} is not in the list specified...')
+                    else:
+                        if _file.endswith(self.file_ext):
+                            self.log.info(f'Copied file {_file} into S3 bucket...')
+                            s3_hook.load_file(filename=os.path.join(path, _file), bucket_name=self.s3.bucket,
+                                    key=self.s3_key, replace=True)
+                        else:
+                            self.log.info(f'File {_file} doesnt end with extension {self.file_ext}')
+
             except Exception as e:
-                self.log.warn(f'Failed to copy {file} into S3 bucket...')
+                self.log.warn(f'Failed to copy {_file} into S3 bucket...')
             

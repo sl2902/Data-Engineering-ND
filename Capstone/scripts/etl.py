@@ -431,6 +431,7 @@ def main():
     spark = create_spark_session()
     logger.info('Pyspark session created...')
 
+    data_dir = config['LOCAL']['data_dir']
     path = config['LOCAL']['sas_data_dir']
     files = json.loads(config['LOCAL']['input_files'])
     airport_file = os.path.join(base_dir, config['LOCAL']['airports_file'])

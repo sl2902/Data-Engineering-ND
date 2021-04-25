@@ -1,18 +1,38 @@
 from datetime import datetime, timedelta
 import os
 from airflow import DAG
-from airflow.operators.dummy import DummyOperator
-from operators import (CreateS3BucketOperator, CopyFilesToS3Operator)
-from airflow.providers.postgres.operators.postgres import PostgresOperator
+from airflow.operators.dummy_operator import DummyOperator
+from airflow.operators import (CreateS3BucketOperator, CopyFilesToS3Operator)
+# from operators.create_s3_bucket import CreateS3BucketOperator
+# from operators.copy_files_to_s3 import CopyFilesToS3Operator
+from airflow.operators.postgres_operator import PostgresOperator
 import configparser
+import json
 
 parser = configparser.ConfigParser()
-parser.read('../../config/etl_config.cfg')
+# cfg_rel_path = os.path.dirname(os.path.realpath(__file__))
+# print(cfg_rel_path)
+# f = os.path.relpath('/Users/home/Documents/dend/Data-Engineering-ND/Capstone/config/etl_config.cfg', cfg_rel_path)
+# print(f)
+try:
+    parser.read('config/etl_config.cfg')
+    # parser.read(os.path.join(os.path.abspath('config'), 'etl_config.cfg'))
+except Exception as e:
+    print('Cannot find etl_config.cfg file...')
+    self.log.error('Cannot find etl_config.cfg file...')
+    raise
 
 aws_region = parser['AWS']['aws_region']
 base_dir = parser['LOCAL']['base_dir']
+data_dir = parser['LOCAL']['data_dir']
+dict_dir = parser['LOCAL']['dict_dir']
+
+data_dir = os.path.join(base_dir, data_dir)
+dict_dir = os.path.join(base_dir, dict_dir)
+files = json.loads(parser['LOCAL']['input_files'])
+
 s3_bucket = parser['S3']['s3_bucket']
-s3_raw_key = parser['S3']['s3_raw_key']
+s3_sas_key = parser['S3']['s3_sas_key']
 s3_csv_key = parser['S3']['s3_csv_key']
 s3_dict_key = parser['S3']['s3_dict_key']
 
@@ -31,7 +51,7 @@ with DAG(
         'Immigrations',
         default_args=default_args,
         description='Create and copy files to S3 bucket with Airflow',
-        schedule_interval='0 * * * *'
+        schedule_interval='@daily'
         ) as dag:
         start_operator = DummyOperator(task_id='Begin_execution',  dag=dag)
         
@@ -47,17 +67,18 @@ with DAG(
             task_id='Copy_raw_sas_files',
             dag=dag,
             aws_credentials='aws_credentials',
-            source_path=base_dir,
+            source_path=data_dir,
             file_ext='sas7bdat',
             s3_bucket=s3_bucket,
-            s3_key=s3_raw_key
+            s3_key=s3_sas_key,
+            src_files = files
         )
         
         copy_csv_files = CopyFilesToS3Operator(
             task_id='Copy_csv_files',
             dag=dag,
             aws_credentials='aws_credentials',
-            source_path=base_dir,
+            source_path=data_dir,
             file_ext='csv',
             s3_bucket=s3_bucket,
             s3_key=s3_csv_key
@@ -67,7 +88,7 @@ with DAG(
             task_id='Copy_data_dictionary',
             dag=dag,
             aws_credentials='aws_credentials',
-            source_path=base_dir,
+            source_path=dict_dir,
             file_ext='SAS',
             s3_bucket=s3_bucket,
             s3_key=s3_dict_key
@@ -79,4 +100,4 @@ with DAG(
         
         create_s3_bucket >> [copy_sas_files, copy_csv_files, copy_data_dictionary]
         
-        [copy_sas_files, copy_csv_files, copy_data_dictionary] << end_operator
+        [copy_sas_files, copy_csv_files, copy_data_dictionary] >> end_operator
