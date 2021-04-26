@@ -40,23 +40,20 @@ class CopyFilesToS3Operator(BaseOperator):
         for path, _, files in os.walk(self.source_path):
             try:
                 for _file in files:
-                    # Added this condition to limit
-                    # the SAS files to only 2 files
                     if self.src_files is not None:
                         if _file in self.src_files:
+                            s3_hook.load_file(os.path.join(path, _file), os.path.join(self.s3_key, _file), 
+                                        bucket_name=self.s3_bucket, replace=True)
                             self.log.info(f'Copied file {_file} into S3 bucket...')
-                            s3_hook.load_file(filename=os.path.join(path, _file), bucket_name=self.s3.bucket,
-                                    key=self.s3_key, replace=True)
-                        else:
-                            self.log.info(f'File {_file} is not in the list specified...')
+                        # else:
+                        #     self.log.info(f'File {_file} is not in the list specified...')
                     else:
                         if _file.endswith(self.file_ext):
+                            s3_hook.load_file(os.path.join(path, _file), os.path.join(self.s3_key, _file), 
+                                        bucket_name=self.s3_bucket, replace=True)
                             self.log.info(f'Copied file {_file} into S3 bucket...')
-                            s3_hook.load_file(filename=os.path.join(path, _file), bucket_name=self.s3.bucket,
-                                    key=self.s3_key, replace=True)
-                        else:
-                            self.log.info(f'File {_file} doesnt end with extension {self.file_ext}')
-
+                        # else:
+                        #     self.log.info(f"File {_file} doesn't end with extension {self.file_ext}")
             except Exception as e:
                 self.log.warn(f'Failed to copy {_file} into S3 bucket...')
             

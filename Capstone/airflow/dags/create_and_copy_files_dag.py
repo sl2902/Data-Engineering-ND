@@ -23,13 +23,18 @@ except Exception as e:
     raise
 
 aws_region = parser['AWS']['aws_region']
-base_dir = parser['LOCAL']['base_dir']
-data_dir = parser['LOCAL']['data_dir']
-dict_dir = parser['LOCAL']['dict_dir']
+# base_dir = parser['LOCAL']['base_dir']
+# data_dir = parser['LOCAL']['data_dir']
+# dict_dir = parser['LOCAL']['dict_dir']
+
+base_dir = parser['DOCKER']['base_dir']
+data_dir = parser['DOCKER']['data_dir']
+dict_dir = parser['DOCKER']['dict_dir']
 
 data_dir = os.path.join(base_dir, data_dir)
 dict_dir = os.path.join(base_dir, dict_dir)
-files = json.loads(parser['LOCAL']['input_files'])
+# files = json.loads(parser['LOCAL']['input_files'])
+files = json.loads(parser['DOCKER']['input_files'])
 
 s3_bucket = parser['S3']['s3_bucket']
 s3_sas_key = parser['S3']['s3_sas_key']

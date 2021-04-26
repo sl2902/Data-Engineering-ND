@@ -37,6 +37,7 @@ services:
             - ./config:/usr/local/airflow/config
             - ./src:/usr/local/airflow/src
             - ./data:/usr/local/data
+            - ./dictionary:/usr/local/dictionary
         ports:
             - "8080:8080"
         command: webserver
@@ -71,6 +72,7 @@ services:
             - ./config:/usr/local/airflow/config
             - ./src:/usr/local/airflow/src
             - ./data:/usr/local/data
+            - ./dictionary:/usr/local/dictionary
         environment:
             - LOAD_EX=n
             - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
@@ -94,6 +96,7 @@ services:
             - ./config:/usr/local/airflow/config
             - ./src:/usr/local/airflow/src
             - ./data:/usr/local/data
+            - ./dictionary:/usr/local/dictionary
         environment:
             - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
             - EXECUTOR=Celery

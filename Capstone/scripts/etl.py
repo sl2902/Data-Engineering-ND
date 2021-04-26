@@ -147,16 +147,16 @@ def i94_immigrations(df, f, cols):
         raise
     return immigrations
 
-def i94_visitors(spark, df):
+def i94_trips(spark, df):
     """
-    Build the i94_visitors DataFrame which is a fact
+    Build the i94_trips DataFrame which is a fact
     :params spark - A Pyspark object
     :params df - A Pyspark raw DataFrame
     Returns - A cleaned fact DataFrame
     """
     try:
-        df.createOrReplaceTempView('i94_visitors')
-        visitors = spark.sql("""
+        df.createOrReplaceTempView('i94_trips')
+        trips = spark.sql("""
             SELECT
                 DISTINCT
                 STRING(INT(cicid)) AS custom_client_id,
@@ -171,13 +171,40 @@ def i94_visitors(spark, df):
                 STRING(INT(i94visa)) AS visa_id,
                 STRING(visatype) AS visa_category
             FROM
+                i94_trips
+        """) 
+    except Exception as e:
+        logger.error('Failed to create i94_trips DataFrame...')
+        logger.error(e)
+        raise
+    return trips
+
+def i94_visitors(spark, df):
+    """
+    Build the i94_visitors DataFrame which is a dimension
+    :params spark - A Pyspark object
+    :params df - A Pyspark raw DataFrame
+    Returns - A cleaned fact DataFrame
+    """
+    try:
+        df.createOrReplaceTempView('i94_visitors')
+        visitors = spark.sql("""
+            SELECT
+                DISTINCT
+                STRING(INT(admnum)) AS admissions_number,
+                INT(i94yr) AS i94_year,
+                INT(i94mon) AS i94_month,
+                STRING(INT(i94res)) AS resident_country_id,
+                INT(biryear) AS birth_year,
+                gender
+            FROM
                 i94_visitors
         """) 
     except Exception as e:
         logger.error('Failed to create i94_visitors DataFrame...')
         logger.error(e)
         raise
-    return visitors
+    return visitors    
 
 def i94_flights(spark, df):
     """
@@ -295,7 +322,7 @@ def i94_dates(spark, df):
                     F.dayofweek('arrival_date').alias('dayofweek'),
                     F.when((F.dayofweek('arrival_date') == 1) | 
                            (F.dayofweek('arrival_date') == 7), 'weekend').otherwise('weekday').alias('is_weekend')
-        )
+        ).dropDuplicates()
     )
     return i94_dates
 
@@ -320,6 +347,25 @@ def parse_ref_file(file, start_pos=2, end_pos=7):
                 ref_dict[k] = v
     return ref_dict
 
+def build_df_from_ref_file(ref_file, start_pos=2, end_pos=7, 
+                            col_name=None, index_name=None):
+    """
+    Create DataFrame from the parsed Data dictionary file
+    :params ref_file - SAS Data dictionary file
+    :params start_pos - Starting position of the section to read from
+    :params end_pos - Ending position of the section
+    :params col_name - Name of the new column
+    :params index_name - Name of the new index
+    Returns - A DataFrame
+    """
+    return (
+        pd.Series(parse_ref_file(ref_file, start_pos, end_pos))
+        .to_frame()
+        .rename(columns={0: col_name})
+        .reset_index()
+        .rename(columns={'index': index_name})
+    )
+
 def write_dataframes(df, output_file, 
                     fmt='parquet', is_partition=True, is_overwrite=True):
     """
@@ -336,50 +382,58 @@ def write_dataframes(df, output_file,
             if is_partition:
                 if is_overwrite:
                     (
-                        df.write.mode('overwrite')
+                        df.write.option('header', 'True')
+                                    .mode('overwrite')
                                     .partitionBy('i94_year', 'i94_month')
                                     .parquet(output_file)
                     )
                 else:
                     (
-                        df.write.mode('append')
+                        df.write.option('header', 'True')
+                                    .mode('append')
                                     .partitionBy('i94_year', 'i94_month')
                                     .parquet(output_file)
                     )
             else:
                 if is_overwrite:
                     (
-                        df.write.mode('overwrite')
+                        df.write.option('header', 'True')
+                                    .mode('overwrite')
                                     .parquet(output_file)
                     )
                 else:
                     (
-                        df.write.mode('append')
+                        df.write.option('header', 'True')
+                                    .mode('append')
                                     .parquet(output_file)
                     )
         else:
             if is_partition:
                 if is_overwrite:
                     (
-                        df.write.mode('overwrite')
+                        df.write.option('header', 'True')
+                                    .mode('overwrite')
                                     .partitionBy('i94_year', 'i94_month')
                                     .csv(output_file)
                     )
                 else:
                     (
-                        df.write.mode('append')
+                        df.write.option('header', 'True')
+                                    .mode('append')
                                     .partitionBy('i94_year', 'i94_month')
                                     .csv(output_file)
                     )
             else:
                 if is_overwrite:
                     (
-                        df.write.mode('overwrite')
-                                    .csv(output_file)
+                        df.write.option('header', 'True')
+                                .mode('overwrite')
+                                .csv(output_file)
                     )
                 else:
                     (
-                        df.write.mode('append')
+                        df.write.option('header', 'True')
+                                    .mode('append')
                                     .csv(output_file)
                     )
 
@@ -387,6 +441,75 @@ def write_dataframes(df, output_file,
         logger.error(f'Failed to write {output_file} DataFrame into {fmt} format...')
         logger.error(e)
         raise
+
+def create_and_write_df(df, table, f_transform, 
+                        output_dir,
+                        spark=None, cols=None,
+                        udf=None, fmt='parquet',
+                        is_partition=True,
+                        is_overwrite=True,
+                        crate_date_df=False):
+    """
+    Helper function to perform both DataFrame creation and
+    writing the results to either Parquet or CSV
+    :params df - A Pyspark/Pandas DataFrame
+    :params table - Name of the transformed file
+    :params f_transform - Function to apply
+    :params output_dir - Output directory to write file to
+    :params spark - A Pyspark object
+    :params cols - A list of columns to select
+    :params udf - Pyspark UDF
+    :params fmt - Format type to apply
+    :params is_partition - A boolean to decide whether to parition or not
+    :params is_overwrite - A boolean to decide whether to overwrite or append
+    :params create_date_df - Boolean to determine whether to
+                            create DataFrame for Date dimension
+    Returns - A Pyspark Dataframe if create_date_df=True
+    """
+    res_df = None
+    if spark is None:
+        res_df = f_transform(df, udf, cols)
+    else:
+        res_df = f_transform(spark, df)
+    logger.info(f'Successfully created {table}...')
+    logger.info(f'Number of records {res_df.count()}')
+
+    write_dataframes(res_df, os.path.join(output_dir, table), 
+                    fmt=fmt, is_partition=is_partition, is_overwrite=is_overwrite)
+    logger.info(f'Successfully written {table} into {fmt.capitalize()} format...')
+
+    return res_df
+
+def create_and_write_ref_df(dictionary_file, table, output_dir, spark, 
+                        fmt='csv', start_pos=2, end_pos=3,
+                        col_name=None, index_name=None,
+                        is_partition=True,
+                        is_overwrite=True):
+    """
+    Helper function to create and write reference dimensions into CSV
+    :params dictionary_file - The SAS data dictionary
+    :params table - Name of the transformed file
+    :params fmt - Format type to apply
+    :params start_pos - Starting position of the section to read from
+    :params end_pos - Ending position of the section
+    :params col_name - Name of the new column
+    :params index_name - Name of the new index
+    :params is_partition - A boolean to decide whether to parition or not
+    :params is_overwrite - A boolean to decide whether to overwrite or append
+    Returns - None
+    """
+    res_df = build_df_from_ref_file(dictionary_file, start_pos=start_pos, end_pos=end_pos, 
+                            col_name=col_name, index_name=index_name) 
+    logger.info(f'Successfully created {table}...')
+    logger.info(f'Number of records {len(res_df)}')
+    if table == 'i94_port_state_mapping':
+            logger.info(f'Updating the column names for {table}...')
+            res_df = pd.concat([res_df['i94_port'].to_frame(), res_df['city'].str.strip().str.rsplit(',', 1, expand=True)], axis=1)
+            res_df.rename(columns={0: 'city', 1: 'state'}, inplace=True)
+
+    write_dataframes(spark.createDataFrame(res_df), os.path.join(output_dir, table),
+                    fmt=fmt, is_partition=is_partition, is_overwrite=is_overwrite)
+    logger.info(f'Successfully written {table} into csv format...')
 
 
 def enable_logging(log_dir, log_file):
@@ -433,9 +556,11 @@ def main():
 
     data_dir = config['LOCAL']['data_dir']
     path = config['LOCAL']['sas_data_dir']
+    dict_dir = config['LOCAL']['dict_dir']
     files = json.loads(config['LOCAL']['input_files'])
-    airport_file = os.path.join(base_dir, config['LOCAL']['airports_file'])
-    demographic_file = os.path.join(base_dir, config['LOCAL']['us_demographics_file'])
+    airport_file = os.path.join(base_dir, data_dir, config['LOCAL']['airports_file'])
+    demographic_file = os.path.join(base_dir, data_dir, config['LOCAL']['us_demographics_file'])
+    dictionary_file = os.path.join(base_dir, dict_dir, config['LOCAL']['dictionary_file'])
     output_dir = os.path.join(base_dir, config['LOCAL']['output_dir'])
     logger.info("Create output dir if it doesn't exist...")
     pathlib.Path(output_dir).mkdir(exist_ok=True)
@@ -444,7 +569,7 @@ def main():
     dfs = []
     for file in files:
         df = spark.read.format('com.github.saurfang.sas.spark')\
-                    .load(os.path.join(base_dir, path, file))
+                    .load(os.path.join(base_dir, data_dir, path, file))
         dfs.append(df)
     logger.info(f'Read {len(files)} files successfully...')
     df = concat_df(*dfs)
@@ -457,89 +582,88 @@ def main():
     # change_date_format_2 = F.udf(lambda x: datetime.strptime(x.strip(), '%m%d%Y'), Date())
     dt = F.udf(change_date_format, Date())
 
-    table = 'i94_immigrations'
-    logger.info(f'Create {table} DataFrame...')
+    # SAS raw data table creation begins here
     cols = ['cicid', 'i94yr', 'i94mon', 'i94port', 'i94mode', 'visapost', 
        'entdepa', 'entdepd', 'entdepu', 'matflag', 
        'dtadfile', 'dtaddto']
-    res_df = i94_immigrations(df, dt, cols)
-    logger.info(f'Successfully created {table}...')
-    logger.info(f'Number of records {res_df.count()}')
+    parquet_tables = ['i94_immigrations', 'i94_trips', 'i94_visitors', 'i94_flights']
+    f_transforms = [i94_immigrations, i94_trips, i94_visitors, i94_flights]
+    res_df = None
+    for table, f_transform in zip(parquet_tables, f_transforms):
+        if table == 'i94_immigrations':
+            res_df = create_and_write_df(df, table, f_transform, 
+                            output_dir,
+                            spark=None, cols=cols,
+                            udf=dt, fmt='parquet',
+                            is_partition=True,
+                            is_overwrite=True,
+                            crate_date_df=False)
+        elif table == 'i94_flights':
+            res_df = create_and_write_df(df, table, f_transform, 
+                output_dir,
+                spark=spark, cols=None,
+                udf=None, fmt='csv',
+                is_partition=False,
+                is_overwrite=True,
+                crate_date_df=False)
+        else:
+            res_df = create_and_write_df(df, table, f_transform, 
+                        output_dir,
+                        spark=spark, cols=None,
+                        udf=None, fmt='parquet',
+                        is_partition=True,
+                        is_overwrite=True,
+                        crate_date_df=False)
 
-    fmt = 'parquet'
-    write_dataframes(res_df, os.path.join(output_dir, table), 
-                    fmt=fmt, is_partition=True, is_overwrite=True)
-    logger.info(f'Successfully written {table} into Parquet format...')
+        if table == 'i94_trips':
+            table = 'i94_dates'
+            create_and_write_df(res_df, table, i94_dates, 
+                        output_dir,
+                        spark=spark, cols=None,
+                        udf=None, fmt='parquet',
+                        is_partition=True,
+                        is_overwrite=True,
+                        crate_date_df=False)
 
-    table = 'i94_visitors'
-    logger.info(f'Create {table} DataFrame...')
-    res_visitor_df = i94_visitors(spark, df)
-    logger.info(f'Successfully created {table}...')
-    logger.info(f'Number of records {res_df.count()}')
-
-    write_dataframes(res_df, os.path.join(output_dir, table),
-                    fmt=fmt, is_partition=True, is_overwrite=True)
-    logger.info(f'Successfully written {table} into Parquet format...')
-
-    table = 'i94_dates'
-    logger.info(f'Create {table} DataFrame...')
-    res_df = i94_dates(spark, res_visitor_df)
-    logger.info(f'Successfully created {table}...')
-    logger.info(f'Number of records {res_df.count()}')
-
-    write_dataframes(res_df, os.path.join(output_dir, table),
-                    fmt=fmt, is_partition=True, is_overwrite=True)
-    logger.info(f'Successfully written {table} into parquet format...') 
-
-    table = 'i94_flights'
-    logger.info(f'Create {table} DataFrame...')
-    res_df = i94_flights(spark, df)
-    logger.info(f'Successfully created {table}...')
-    logger.info(f'Number of records {res_df.count()}')
-
-    fmt = 'csv'
-    write_dataframes(res_df, os.path.join(output_dir, table),
-                    fmt=fmt, is_partition=False, is_overwrite=True)
-    logger.info(f'Successfully written {table} into csv format...')
-    
-
+    # Reference data for airports and us city demographics begins here
     logger.info('Read the airports reference file...')
     airport_df = spark.read.option('header', True) \
                             .csv(airport_file)
-    
-    table = 'i94_airports'
-    logger.info(f'Create {table} DataFrame...')
-    res_df = i94_airports(spark, airport_df)
-    logger.info(f'Successfully created {table}...')
-    logger.info(f'Number of records {res_df.count()}')
-
-    write_dataframes(res_df, os.path.join(output_dir, table),
-                    fmt=fmt, is_partition=False, is_overwrite=True)
-    logger.info(f'Successfully written {table} into csv format...')
 
     logger.info('Read the US demographics reference file...')
     demographic_df = spark.read.options(header='True', delimiter=';') \
-                            .csv(demographic_file)
+                            .csv(demographic_file)                        
+    csv_tables = ['i94_airports', 'i94_us_states_demographic', 
+            'i94_us_cities_demographic']
+    f_transforms = [i94_airports, i94_us_states_demographic, i94_us_cities_demographic]
+    csv_dfs = [airport_df, demographic_df, demographic_df]
+    for table, f_transform, df in zip(csv_tables, f_transforms, csv_dfs):
+        res_df = create_and_write_df(df, table, f_transform, 
+                        output_dir,
+                        spark=spark, cols=None,
+                        udf=dt, fmt='csv',
+                        is_partition=False,
+                        is_overwrite=True)
     
-    table = 'i94_us_states_demographic'
-    logger.info(f'Create {table} DataFrame...')
-    res_df = i94_us_states_demographic(spark, demographic_df)
-    logger.info(f'Successfully created {table}...')
-    logger.info(f'Number of records {res_df.count()}')
-
-    write_dataframes(res_df, os.path.join(output_dir, table),
-                    fmt=fmt, is_partition=False, is_overwrite=True)
-    logger.info(f'Successfully written {table} into csv format...') 
-
-    table = 'i94_us_cities_demographic'
-    logger.info(f'Create {table} DataFrame...')
-    res_df = i94_us_cities_demographic(spark, demographic_df)
-    logger.info(f'Successfully created {table}...')
-    logger.info(f'Number of records {res_df.count()}')
-
-    write_dataframes(res_df, os.path.join(output_dir, table),
-                    fmt=fmt, is_partition=False, is_overwrite=True)
-    logger.info(f'Successfully written {table} into csv format...')
+    # SAS reference data creation begins here
+    ref_csv_tables = ['i94_countries', 'i94_port_state_mapping', 'i94_travel_mode', 
+            'i94_state_mapping', 'i94_visa']
+    table_pos_dict = {
+        'i94_countries': [2, 3, 'country', 'country_id'],
+        'i94_port_state_mapping': [3, 4, 'city', 'i94_port'],
+        'i94_travel_mode': [4, 5, 'mode', 'mode_id'],
+        'i94_state_mapping': [5, 6, 'state', 'state_id'],
+        'i94_visa': [6, 7, 'visa_purpose', 'visa_id']
+    }
+    logger.info('Read the SAS data dictionary reference file...') 
+    for table in ref_csv_tables:
+        create_and_write_ref_df(dictionary_file, table, output_dir, spark, 
+                        fmt='csv', start_pos=table_pos_dict[table][0], 
+                        end_pos=table_pos_dict[table][1],
+                        col_name=table_pos_dict[table][2], 
+                        index_name=table_pos_dict[table][3],
+                        is_partition=False,
+                        is_overwrite=True)
 
     logger.info('ETL parsing has completed...')
     logger.info('Time taken to complete job {} minutes'.format((time.time() - t0) / 60))
