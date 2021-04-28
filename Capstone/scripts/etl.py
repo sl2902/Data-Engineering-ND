@@ -28,6 +28,8 @@ from pyspark.sql.types import (StructType as R,
 DATE_FMT = datetime.strftime(datetime.today(), '%Y%m%d')
 FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 CFG_FILE = r'/Users/home/Documents/dend/Data-Engineering-ND/Capstone/config/etl_config.cfg'
+# CFG_FILE = r'/usr/local/airflow/config/etl_config.cfg'
+CFG_FILE = "s3://immigrations-analytics/config/etl_config.cfg"
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -542,9 +544,12 @@ def main():
         print('Configuration file is missing or cannot be read...')
         raise
 
-    base_dir = config['LOCAL']['base_dir']
-    log_dir = os.path.join(base_dir, config['LOCAL']['log_dir'])
-    log_file = config['LOCAL']['log_file']
+    # base_dir = config['LOCAL']['base_dir']
+    # log_dir = os.path.join(base_dir, config['LOCAL']['log_dir'])
+    # log_file = config['LOCAL']['log_file']
+    base_dir = config['HADOOP']['base_dir']
+    log_dir = os.path.join(base_dir, config['HADOOP']['log_dir'])
+    log_file = config['HADOOP']['log_file']
     print("Create log dir if it doesn't exist...")
     pathlib.Path(log_dir).mkdir(exist_ok=True)
     file_handler = enable_logging(log_dir, log_file)
@@ -554,14 +559,26 @@ def main():
     spark = create_spark_session()
     logger.info('Pyspark session created...')
 
-    data_dir = config['LOCAL']['data_dir']
-    path = config['LOCAL']['sas_data_dir']
-    dict_dir = config['LOCAL']['dict_dir']
+    # data_dir = config['LOCAL']['data_dir']
+    # path = config['LOCAL']['sas_data_dir']
+    # sas_file_path = os.path.join(base_dir, data_dir, path)
+    # dict_dir = config['LOCAL']['dict_dir']
+    # files = json.loads(config['LOCAL']['input_files'])
+    # airport_file = os.path.join(base_dir, data_dir, config['LOCAL']['airports_file'])
+    # demographic_file = os.path.join(base_dir, data_dir, config['LOCAL']['us_demographics_file'])
+    # dictionary_file = os.path.join(base_dir, dict_dir, config['LOCAL']['dictionary_file'])
+    # output_dir = os.path.join(base_dir, config['LOCAL']['output_dir'])
+    data_dir = config['S3']['s3_bucket']
+    path = config['S3']['s3_sas_key']
+    sas_file_path = os.path.join("s3://", data_dir, path)
+    dict_dir = config['LOCAL']['s3_dict_key']
+    csv_dir = config['LOCAL']['s3_csv_key']
     files = json.loads(config['LOCAL']['input_files'])
-    airport_file = os.path.join(base_dir, data_dir, config['LOCAL']['airports_file'])
-    demographic_file = os.path.join(base_dir, data_dir, config['LOCAL']['us_demographics_file'])
-    dictionary_file = os.path.join(base_dir, dict_dir, config['LOCAL']['dictionary_file'])
-    output_dir = os.path.join(base_dir, config['LOCAL']['output_dir'])
+    airport_file = os.path.join("s3://", data_dir, csv_dir, config['S3']['airport_file'])
+    demographic_file = os.path.join("s3://", data_dir, csv_dir, config['S3']['demographic_file'])
+    dictionary_file = os.path.join("s3://", dict_dir, config['S3']['dictionary_file'])
+    output_dir = os.path.join("s3://", data_dir, config['s3']['output_dir'])
+
     logger.info("Create output dir if it doesn't exist...")
     pathlib.Path(output_dir).mkdir(exist_ok=True)
 
@@ -569,7 +586,7 @@ def main():
     dfs = []
     for file in files:
         df = spark.read.format('com.github.saurfang.sas.spark')\
-                    .load(os.path.join(base_dir, data_dir, path, file))
+                    .load(os.path.join(sas_file_path, file))
         dfs.append(df)
     logger.info(f'Read {len(files)} files successfully...')
     df = concat_df(*dfs)

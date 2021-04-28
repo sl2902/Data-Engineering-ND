@@ -35,7 +35,7 @@ services:
             - ./airflow/plugins:/usr/local/airflow/plugins
             - ./requirements.txt:/requirements.txt
             - ./config:/usr/local/airflow/config
-            - ./src:/usr/local/airflow/src
+            - ./scripts:/usr/local/airflow/scripts
             - ./data:/usr/local/data
             - ./dictionary:/usr/local/dictionary
         ports:
@@ -70,7 +70,7 @@ services:
             - ./airflow/plugins:/usr/local/airflow/plugins
             - ./requirements.txt:/requirements.txt
             - ./config:/usr/local/airflow/config
-            - ./src:/usr/local/airflow/src
+            - ./scripts:/usr/local/airflow/scripts
             - ./data:/usr/local/data
             - ./dictionary:/usr/local/dictionary
         environment:
@@ -94,7 +94,7 @@ services:
             - ./airflow/plugins:/usr/local/airflow/plugins
             - ./requirements.txt:/requirements.txt
             - ./config:/usr/local/airflow/config
-            - ./src:/usr/local/airflow/src
+            - ./scripts:/usr/local/airflow/scripts
             - ./data:/usr/local/data
             - ./dictionary:/usr/local/dictionary
         environment:

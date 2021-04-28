@@ -43,7 +43,7 @@ s3_dict_key = parser['S3']['s3_dict_key']
 
 default_args = {
     'owner': 'god',
-    'start_date': datetime(2021, 4, 24),
+    'start_date': datetime(2021, 4, 27),
     'depends_on_past': False,
     'retries': 3,
     'retry_delay': timedelta(minutes=5),
@@ -53,7 +53,7 @@ default_args = {
 }
 
 with DAG(
-        'Immigrations',
+        'i94_copy_files_to_s3',
         default_args=default_args,
         description='Create and copy files to S3 bucket with Airflow',
         schedule_interval='@daily'
