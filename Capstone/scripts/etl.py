@@ -1,6 +1,6 @@
 """
 This is the main script which will handle the ETL pipeline
-for parsing the Immigrations data including any miscellanous
+for parsing the Immigrations data including any miscellaneous
 datasets
 
 Airflow will be used for orchestration
@@ -16,7 +16,9 @@ import configparser
 import json
 from functools import reduce
 import logging
-
+import boto3
+import argparse
+from pyspark import SparkContext
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.functions import date_add
@@ -27,25 +29,50 @@ from pyspark.sql.types import (StructType as R,
 
 DATE_FMT = datetime.strftime(datetime.today(), '%Y%m%d')
 FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-CFG_FILE = r'/Users/home/Documents/dend/Data-Engineering-ND/Capstone/config/etl_config.cfg'
 # CFG_FILE = r'/usr/local/airflow/config/etl_config.cfg'
-CFG_FILE = "s3://immigrations-analytics/config/etl_config.cfg"
+# CFG_FILE = "s3://immigrations-analytics1/config/etl_config.cfg"
+# SAS_JAR = 'saurfang:spark-sas7bdat:3.0.0-s_2.12'
+# SAS_JAR = "saurfang:spark-sas7bdat:2.0.0-s_2.11"
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+def create_client(service, region, access_key_id, secret_access_key):
+    """
+    Create client to access AWS resource
+    :params service - Any AWS service
+    :params region - AWS specific region
+    :params access_key_id - AWS credential
+    :params secret_access_key - AWS credential
+    Returns - A boto3 client
+    """
+    client = boto3.client(service,
+                          region_name=region,
+                          aws_access_key_id=access_key_id,
+                          aws_secret_access_key=secret_access_key
+                          )
+    return client
+
 def create_spark_session():
     """
     Build a Pyspark session
-    :Returns - A Pyspark object
+    Returns - A Pyspark object
     """
     try:
         spark = (
                     SparkSession.builder
-                                .config("spark.jars.packages", "saurfang:spark-sas7bdat:3.0.0-s_2.12")
+                                .config("spark.jars.packages", os.environ['SAS_JAR'])
+                                # .config("spark.hadoop.fs.s3a.awsAccessKeyId", os.environ['AWS_ACCESS_KEY_ID'])
+                                # .config("spark.hadoop.fs.s3a.awsSecretAccessKey", os.environ['AWS_SECRET_ACCESS_KEY'])
                                 .enableHiveSupport()
                                 .getOrCreate()
         )
+        # spark._jsc.hadoopConfiguration().set("fs.s3a.awsAccessKeyId", os.environ['AWS_ACCESS_KEY_ID'])
+        # spark._jsc.hadoopConfiguration().set("fs.s3a.awsSecretAccessKey", os.environ['AWS_SECRET_ACCESS_KEY'])
+        # spark._jsc.hadoopConfiguration().set("fs.s3a.impl","org.apache.hadoop.fs.s3a.S3AFileSystem")
+        # spark._jsc.hadoopConfiguration().set("com.amazonaws.services.s3.enableV4", "true")
+        # spark._jsc.hadoopConfiguration().set("fs.s3a.aws.credentials.provider","org.apache.hadoop.fs.s3a.BasicAWSCredentialsProvider")
+        # spark._jsc.hadoopConfiguration().set("fs.s3a.endpoint", "s3.amazonaws.com")
     except Exception as e:
         logger.error('Pyspark session failed to be created...')
         raise
@@ -55,7 +82,7 @@ def concat_df(*dfs):
     """
     Concat the DataFrames
     :params *dfs - A list of DataFrames()
-    : Returns - A Concatenated Pyspark DataFrame
+    Returns - A Concatenated Pyspark DataFrame
     """
     try:
         return reduce(DataFrame.unionAll, dfs)
@@ -69,7 +96,7 @@ def read_raw_files(path):
     Read the raw SAS files stored locally
     and append them altogether
     :params path - Location of the raw files
-    : Returns - A Concatenated Pyspark DataFrame
+    Returns - A Concatenated Pyspark DataFrame
     """
     dfs = []
     try:
@@ -339,14 +366,18 @@ def parse_ref_file(file, start_pos=2, end_pos=7):
     """
     data = []
     ref_dict = {}
-    with open(file) as f:
-        content = f.read()
-        data = [word for lines in content.split(';')[start_pos: end_pos] for word in lines.splitlines(True) if '=' in word]
-        for item in data:
-            k = item.split('=')[0].strip().strip("'")
-            v = item.split('=')[1].strip().strip("'") 
-            if k not in ref_dict:
-                ref_dict[k] = v
+    try:
+        with open(file) as f:
+            content = f.read()
+            data = [word for lines in content.split(';')[start_pos: end_pos] for word in lines.splitlines(True) if '=' in word]
+            for item in data:
+                k = item.split('=')[0].strip().strip("'")
+                v = item.split('=')[1].strip().strip("'") 
+                if k not in ref_dict:
+                    ref_dict[k] = v
+    except Exception as e:
+        logger.info('Failed to parse SAS dictionary...')
+        return {}
     return ref_dict
 
 def build_df_from_ref_file(ref_file, start_pos=2, end_pos=7, 
@@ -358,7 +389,7 @@ def build_df_from_ref_file(ref_file, start_pos=2, end_pos=7,
     :params end_pos - Ending position of the section
     :params col_name - Name of the new column
     :params index_name - Name of the new index
-    Returns - A DataFrame
+    Returns - A Pandas DataFrame
     """
     return (
         pd.Series(parse_ref_file(ref_file, start_pos, end_pos))
@@ -384,14 +415,14 @@ def write_dataframes(df, output_file,
             if is_partition:
                 if is_overwrite:
                     (
-                        df.write.option('header', 'True')
+                        df.write.option('header', 'False')
                                     .mode('overwrite')
                                     .partitionBy('i94_year', 'i94_month')
                                     .parquet(output_file)
                     )
                 else:
                     (
-                        df.write.option('header', 'True')
+                        df.write.option('header', 'False')
                                     .mode('append')
                                     .partitionBy('i94_year', 'i94_month')
                                     .parquet(output_file)
@@ -399,13 +430,13 @@ def write_dataframes(df, output_file,
             else:
                 if is_overwrite:
                     (
-                        df.write.option('header', 'True')
+                        df.write.option('header', 'False')
                                     .mode('overwrite')
                                     .parquet(output_file)
                     )
                 else:
                     (
-                        df.write.option('header', 'True')
+                        df.write.option('header', 'False')
                                     .mode('append')
                                     .parquet(output_file)
                     )
@@ -413,14 +444,14 @@ def write_dataframes(df, output_file,
             if is_partition:
                 if is_overwrite:
                     (
-                        df.write.option('header', 'True')
+                        df.write.option('header', 'False')
                                     .mode('overwrite')
                                     .partitionBy('i94_year', 'i94_month')
                                     .csv(output_file)
                     )
                 else:
                     (
-                        df.write.option('header', 'True')
+                        df.write.option('header', 'False')
                                     .mode('append')
                                     .partitionBy('i94_year', 'i94_month')
                                     .csv(output_file)
@@ -428,13 +459,13 @@ def write_dataframes(df, output_file,
             else:
                 if is_overwrite:
                     (
-                        df.write.option('header', 'True')
+                        df.write.option('header', 'False')
                                 .mode('overwrite')
                                 .csv(output_file)
                     )
                 else:
                     (
-                        df.write.option('header', 'True')
+                        df.write.option('header', 'False')
                                     .mode('append')
                                     .csv(output_file)
                     )
@@ -502,16 +533,17 @@ def create_and_write_ref_df(dictionary_file, table, output_dir, spark,
     """
     res_df = build_df_from_ref_file(dictionary_file, start_pos=start_pos, end_pos=end_pos, 
                             col_name=col_name, index_name=index_name) 
-    logger.info(f'Successfully created {table}...')
-    logger.info(f'Number of records {len(res_df)}')
-    if table == 'i94_port_state_mapping':
-            logger.info(f'Updating the column names for {table}...')
-            res_df = pd.concat([res_df['i94_port'].to_frame(), res_df['city'].str.strip().str.rsplit(',', 1, expand=True)], axis=1)
-            res_df.rename(columns={0: 'city', 1: 'state'}, inplace=True)
+    if len(res_df) > 0:
+        logger.info(f'Successfully created {table}...')
+        logger.info(f'Number of records {len(res_df)}')
+        if table == 'i94_port_state_mapping':
+                logger.info(f'Updating the column names for {table}...')
+                res_df = pd.concat([res_df['i94_port'].to_frame(), res_df['city'].str.strip().str.rsplit(',', 1, expand=True)], axis=1)
+                res_df.rename(columns={0: 'city', 1: 'state'}, inplace=True)
 
-    write_dataframes(spark.createDataFrame(res_df), os.path.join(output_dir, table),
-                    fmt=fmt, is_partition=is_partition, is_overwrite=is_overwrite)
-    logger.info(f'Successfully written {table} into csv format...')
+        write_dataframes(spark.createDataFrame(res_df), os.path.join(output_dir, table),
+                        fmt=fmt, is_partition=is_partition, is_overwrite=is_overwrite)
+        logger.info(f'Successfully written {table} into csv format...')
 
 
 def enable_logging(log_dir, log_file):
@@ -522,7 +554,7 @@ def enable_logging(log_dir, log_file):
     Returns - A FileHandler object
     """
     # instantiate logging
-    file_handler = logging.FileHandler(os.path.join(log_dir, log_file + DATE_FMT))
+    file_handler = logging.FileHandler(os.path.join(log_dir, log_file + DATE_FMT + '.log'))
     formatter = logging.Formatter(FORMAT)
     file_handler.setFormatter(formatter)
 
@@ -536,62 +568,133 @@ def main():
     - Write them into partitioned/non-partitioned Parquet/CSV formats
     """
     t0 = time.time()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-e', '--env', default='LOCAL', help='Enter one of DOCKER, LOCAL or S3')
+    parser.add_argument('--bucket-name', help='Enter S3 bucket')
+    parser.add_argument('--aws-access-key-id', help='Enter AWS access key id')
+    parser.add_argument('--aws-secret-access-key', help='Enter AWS secrest access key')
+    # subparser = parser.add_subparsers(dest='subcommand', help='Can choose bucket name if S3 is chosen')
+    # parser_bucket = subparser.add_parser('S3')
+    # parser_bucket.add_argument('bucket', help='S3 bucket name')
+    args = vars(parser.parse_args())
+    args['env'] = args['env'].upper()
+    if args['env'] != 'S3' and args['bucket_name']:
+        parser.error('Can specify a bucket name with only S3...')
+    if args['env'] == 'S3' and not (args['bucket_name'] and 
+                                args['aws_access_key_id'] and
+                                args['aws_secret_access_key']):
+        parser.error('Specify a bucket, access key and secret access key...')
+    # print(args)
+    # print(args['env'])
+    # print(args['subcommand'])
+
+    if args['env'] == 'S3':
+        s3_client = create_client(
+                        "s3",
+                        region="us-west-2",
+                        access_key_id=args['aws_access_key_id'],
+                        secret_access_key=args['aws_secret_access_key']
+                    )
+        os.environ['AWS_ACCESS_KEY_ID'] = args['aws_access_key_id'].strip()
+        os.environ['AWS_SECRET_ACCESS_KEY'] = args['aws_secret_access_key'].strip()
+
     config = configparser.ConfigParser()
+    if args['env'] == 'DOCKER':
+        CFG_FILE = r'/usr/local/airflow/config/etl_config.cfg'
+        try:
+            config.read(CFG_FILE)
+        except Exception as e:
+            print('Configuration file is missing or cannot be read...')
+            raise
+    elif args['env'] == 'S3':
+        obj = s3_client.get_object(Bucket=args['bucket_name'], Key='config/etl_config.cfg')
+        try:
+            config.read_string(obj['Body'].read().decode())
+        except Exception as e:
+            print('Configuration file is missing or cannot be read...')
+            raise
+    else:
+        CFG_FILE = r'/Users/home/Documents/dend/Data-Engineering-ND/Capstone/config/etl_config.cfg'
+        try:
+            config.read(CFG_FILE)
+        except Exception as e:
+            print('Configuration file is missing or cannot be read...')
+            raise
 
+    sas_jar_ver = config['APP']['sas_jar_ver']
+    os.environ['SAS_JAR'] = ".".join(sas_jar_ver.split('.')[:-1])
+
+    if args['env'] == 'DOCKER':
+        base_dir = config['DOCKER']['base_dir']
+        data_dir = config['DOCKER']['data_dir']
+        path = config['DOCKER']['sas_data_dir']
+        sas_file_path = os.path.join(base_dir, data_dir, path)
+        dict_dir = config['DOCKER']['dict_dir']
+        files = json.loads(config['DOCKER']['input_files'])
+        airport_file = os.path.join(base_dir, data_dir, config['DOCKER']['airports_file'])
+        demographic_file = os.path.join(base_dir, data_dir, config['DOCKER']['us_demographics_file'])
+        dictionary_file = os.path.join(base_dir, dict_dir, config['DOCKER']['dictionary_file'])
+        output_dir = os.path.join(base_dir, config['DOCKER']['output_dir'])
+        log_dir = os.path.join(base_dir, config['LOCAL']['log_dir'])
+        log_file = config['LOCAL']['log_file']
+    elif args['env'] == 'S3':
+        bucket = args['bucket_name']
+        path = config['S3']['s3_sas_key']
+        dict_dir = config['S3']['s3_dict_key']
+        csv_dir = config['S3']['s3_csv_key']
+        sas_file_path = os.path.join("s3a://", bucket, csv_dir, path)
+        files = json.loads(config['S3']['input_files'])
+        airport_file = os.path.join("s3a://", bucket, csv_dir, config['S3']['airports_file'])
+        demographic_file = os.path.join("s3a://", bucket, csv_dir, config['S3']['us_demographics_file'])
+        dictionary_file = os.path.join("s3a://", bucket, config['S3']['dictionary_file'])
+        output_dir = os.path.join("s3a://", bucket, config['S3']['output_dir'])
+    else:
+        base_dir = config['LOCAL']['base_dir']
+        data_dir = config['LOCAL']['data_dir']
+        path = config['LOCAL']['sas_data_dir']
+        sas_file_path = os.path.join(base_dir, data_dir, path)
+        dict_dir = config['LOCAL']['dict_dir']
+        files = json.loads(config['LOCAL']['input_files'])
+        airport_file = os.path.join(base_dir, data_dir, config['LOCAL']['airports_file'])
+        demographic_file = os.path.join(base_dir, data_dir, config['LOCAL']['us_demographics_file'])
+        dictionary_file = os.path.join(base_dir, dict_dir, config['LOCAL']['dictionary_file'])
+        output_dir = os.path.join(base_dir, config['LOCAL']['output_dir'])
+        log_dir = os.path.join(base_dir, config['LOCAL']['log_dir'])
+        log_file = config['LOCAL']['log_file']
+    
     try:
-        config.read(CFG_FILE)
-    except Exception as e:
-        print('Configuration file is missing or cannot be read...')
-        raise
+        # Log file written to Hadoop EMR env
+        base_dir = config['HADOOP']['base_dir']
+        log_dir = os.path.join(base_dir, config['HADOOP']['log_dir'])
+        log_file = config['HADOOP']['log_file']
+        pathlib.Path(log_dir).mkdir(exist_ok=True)
+        file_handler = enable_logging(log_dir, log_file)
+        logger.addHandler(file_handler)
+        print("Create log dir if it doesn't exist...")
+    except:
+        base_dir = config['LOCAL']['base_dir']
+        log_dir = os.path.join(base_dir, config['LOCAL']['log_dir'])
+        log_file = config['LOCAL']['log_file']
+        pathlib.Path(log_dir).mkdir(exist_ok=True)
+        file_handler = enable_logging(log_dir, log_file)
+        logger.addHandler(file_handler)
+        print("Create log dir if it doesn't exist...")
 
-    # base_dir = config['LOCAL']['base_dir']
-    # log_dir = os.path.join(base_dir, config['LOCAL']['log_dir'])
-    # log_file = config['LOCAL']['log_file']
-    base_dir = config['HADOOP']['base_dir']
-    log_dir = os.path.join(base_dir, config['HADOOP']['log_dir'])
-    log_file = config['HADOOP']['log_file']
-    print("Create log dir if it doesn't exist...")
-    pathlib.Path(log_dir).mkdir(exist_ok=True)
-    file_handler = enable_logging(log_dir, log_file)
-    logger.addHandler(file_handler)
 
     logger.info('ETL parsing has started...')
+    logger.info("Create output dir if it doesn't exist...")
+    if args['env'] != 'S3':
+        pathlib.Path(output_dir).mkdir(exist_ok=True)
+    else:
+        # config.set('S3', 's3_bucket_name', args['bucket_name'])
+        # s3_client.put_object(Bucket=args['bucket_name'], Key=config['S3']['config_dir'], Body=)
+        s3_client.put_object(Bucket=args['bucket_name'], Key=config['S3']['output_dir'])
+        logger.info('Created S3 bucket...')
+    
     spark = create_spark_session()
     logger.info('Pyspark session created...')
-
-    # data_dir = config['LOCAL']['data_dir']
-    # path = config['LOCAL']['sas_data_dir']
-    # sas_file_path = os.path.join(base_dir, data_dir, path)
-    # dict_dir = config['LOCAL']['dict_dir']
-    # files = json.loads(config['LOCAL']['input_files'])
-    # airport_file = os.path.join(base_dir, data_dir, config['LOCAL']['airports_file'])
-    # demographic_file = os.path.join(base_dir, data_dir, config['LOCAL']['us_demographics_file'])
-    # dictionary_file = os.path.join(base_dir, dict_dir, config['LOCAL']['dictionary_file'])
-    # output_dir = os.path.join(base_dir, config['LOCAL']['output_dir'])
-    data_dir = config['S3']['s3_bucket']
-    path = config['S3']['s3_sas_key']
-    sas_file_path = os.path.join("s3://", data_dir, path)
-    dict_dir = config['LOCAL']['s3_dict_key']
-    csv_dir = config['LOCAL']['s3_csv_key']
-    files = json.loads(config['LOCAL']['input_files'])
-    airport_file = os.path.join("s3://", data_dir, csv_dir, config['S3']['airport_file'])
-    demographic_file = os.path.join("s3://", data_dir, csv_dir, config['S3']['demographic_file'])
-    dictionary_file = os.path.join("s3://", dict_dir, config['S3']['dictionary_file'])
-    output_dir = os.path.join("s3://", data_dir, config['s3']['output_dir'])
-
-    logger.info("Create output dir if it doesn't exist...")
-    pathlib.Path(output_dir).mkdir(exist_ok=True)
-
-    logger.info('Read and concatenate the raw SAS files...')
-    dfs = []
-    for file in files:
-        df = spark.read.format('com.github.saurfang.sas.spark')\
-                    .load(os.path.join(sas_file_path, file))
-        dfs.append(df)
-    logger.info(f'Read {len(files)} files successfully...')
-    df = concat_df(*dfs)
-    logger.info(f'Successfully concatenated {len(files)}...')
-
+    logger.info('Register UDFs...')
+    
     spark.udf.register('SASDateConverter', sas_date_converter, Date())
     logger.info('Register sas_date_converter UDF...')
 
@@ -599,69 +702,94 @@ def main():
     # change_date_format_2 = F.udf(lambda x: datetime.strptime(x.strip(), '%m%d%Y'), Date())
     dt = F.udf(change_date_format, Date())
 
-    # SAS raw data table creation begins here
-    cols = ['cicid', 'i94yr', 'i94mon', 'i94port', 'i94mode', 'visapost', 
-       'entdepa', 'entdepd', 'entdepu', 'matflag', 
-       'dtadfile', 'dtaddto']
-    parquet_tables = ['i94_immigrations', 'i94_trips', 'i94_visitors', 'i94_flights']
-    f_transforms = [i94_immigrations, i94_trips, i94_visitors, i94_flights]
-    res_df = None
-    for table, f_transform in zip(parquet_tables, f_transforms):
-        if table == 'i94_immigrations':
-            res_df = create_and_write_df(df, table, f_transform, 
+    logger.info('Read and concatenate the raw SAS files...')
+    dfs = []
+    for file in files:
+        try:
+            df = spark.read.format('com.github.saurfang.sas.spark')\
+                        .load(os.path.join(sas_file_path, file))
+            dfs.append(df)
+        except Exception as e:
+            logger.info(f'File {file} is not available. Skipping...')
+    logger.info(f'Read {len(files)} files successfully...')
+    df = []
+    if len(dfs) > 0:
+        df = concat_df(*dfs)
+        logger.info(f'Successfully concatenated {len(files)}...')
+    if not isinstance(df, list):
+        # SAS raw data table creation begins here
+        cols = ['cicid', 'i94yr', 'i94mon', 'i94port', 'i94mode', 'visapost', 
+        'entdepa', 'entdepd', 'entdepu', 'matflag', 
+        'dtadfile', 'dtaddto']
+        parquet_tables = ['i94_immigrations', 'i94_trips', 'i94_visitors', 'i94_flights']
+        f_transforms = [i94_immigrations, i94_trips, i94_visitors, i94_flights]
+        res_df = None
+        for table, f_transform in zip(parquet_tables, f_transforms):
+            if table == 'i94_immigrations':
+                # only table not using spark sql
+                res_df = create_and_write_df(df, table, f_transform, 
+                                output_dir,
+                                spark=None, cols=cols,
+                                udf=dt, fmt='parquet',
+                                is_partition=True,
+                                is_overwrite=True,
+                                crate_date_df=False)
+            elif table == 'i94_flights':
+                res_df = create_and_write_df(df, table, f_transform, 
+                    output_dir,
+                    spark=spark, cols=None,
+                    udf=None, fmt='csv',
+                    is_partition=False,
+                    is_overwrite=True,
+                    crate_date_df=False)
+            else:
+                res_df = create_and_write_df(df, table, f_transform, 
                             output_dir,
-                            spark=None, cols=cols,
-                            udf=dt, fmt='parquet',
+                            spark=spark, cols=None,
+                            udf=None, fmt='parquet',
                             is_partition=True,
                             is_overwrite=True,
                             crate_date_df=False)
-        elif table == 'i94_flights':
-            res_df = create_and_write_df(df, table, f_transform, 
-                output_dir,
-                spark=spark, cols=None,
-                udf=None, fmt='csv',
-                is_partition=False,
-                is_overwrite=True,
-                crate_date_df=False)
-        else:
-            res_df = create_and_write_df(df, table, f_transform, 
-                        output_dir,
-                        spark=spark, cols=None,
-                        udf=None, fmt='parquet',
-                        is_partition=True,
-                        is_overwrite=True,
-                        crate_date_df=False)
 
-        if table == 'i94_trips':
-            table = 'i94_dates'
-            create_and_write_df(res_df, table, i94_dates, 
-                        output_dir,
-                        spark=spark, cols=None,
-                        udf=None, fmt='parquet',
-                        is_partition=True,
-                        is_overwrite=True,
-                        crate_date_df=False)
+            if table == 'i94_trips':
+                table = 'i94_dates'
+                create_and_write_df(res_df, table, i94_dates, 
+                            output_dir,
+                            spark=spark, cols=None,
+                            udf=None, fmt='parquet',
+                            is_partition=True,
+                            is_overwrite=True,
+                            crate_date_df=False)
 
     # Reference data for airports and us city demographics begins here
+    airport_df = spark.createDataFrame([], R([]))
+    demographic_df = spark.createDataFrame([], R([]))
     logger.info('Read the airports reference file...')
-    airport_df = spark.read.option('header', True) \
-                            .csv(airport_file)
+    try:
+        airport_df = spark.read.option('header', True) \
+                                .csv(airport_file)
+    except Exception as e:
+        logger.error(f'File {airport_file} is not available. Skipping...')
 
     logger.info('Read the US demographics reference file...')
-    demographic_df = spark.read.options(header='True', delimiter=';') \
-                            .csv(demographic_file)                        
-    csv_tables = ['i94_airports', 'i94_us_states_demographic', 
-            'i94_us_cities_demographic']
-    f_transforms = [i94_airports, i94_us_states_demographic, i94_us_cities_demographic]
-    csv_dfs = [airport_df, demographic_df, demographic_df]
-    for table, f_transform, df in zip(csv_tables, f_transforms, csv_dfs):
-        res_df = create_and_write_df(df, table, f_transform, 
-                        output_dir,
-                        spark=spark, cols=None,
-                        udf=dt, fmt='csv',
-                        is_partition=False,
-                        is_overwrite=True)
-    
+    try:
+        demographic_df = spark.read.options(header='True', delimiter=';') \
+                                .csv(demographic_file)  
+    except Exception as e:
+        logger.error(f'File {demographic_file} is not available. Skipping...')
+    if airport_df.count() > 0 and demographic_df.count() > 0:                     
+        csv_tables = ['i94_airports', 'i94_us_states_demographic', 
+                'i94_us_cities_demographic']
+        f_transforms = [i94_airports, i94_us_states_demographic, i94_us_cities_demographic]
+        csv_dfs = [airport_df, demographic_df, demographic_df]
+        for table, f_transform, df in zip(csv_tables, f_transforms, csv_dfs):
+            res_df = create_and_write_df(df, table, f_transform, 
+                            output_dir,
+                            spark=spark, cols=None,
+                            udf=dt, fmt='csv',
+                            is_partition=False,
+                            is_overwrite=True)
+
     # SAS reference data creation begins here
     ref_csv_tables = ['i94_countries', 'i94_port_state_mapping', 'i94_travel_mode', 
             'i94_state_mapping', 'i94_visa']

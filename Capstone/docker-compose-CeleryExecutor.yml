@@ -36,8 +36,8 @@ services:
             - ./requirements.txt:/requirements.txt
             - ./config:/usr/local/airflow/config
             - ./scripts:/usr/local/airflow/scripts
-            - ./data:/usr/local/data
-            - ./dictionary:/usr/local/dictionary
+            - ./data:/usr/local/airflow/data
+            - ./dictionary:/usr/local/airflow/dictionary
         ports:
             - "8080:8080"
         command: webserver
@@ -71,8 +71,8 @@ services:
             - ./requirements.txt:/requirements.txt
             - ./config:/usr/local/airflow/config
             - ./scripts:/usr/local/airflow/scripts
-            - ./data:/usr/local/data
-            - ./dictionary:/usr/local/dictionary
+            - ./data:/usr/local/airflow/data
+            - ./dictionary:/usr/local/airflow/dictionary
         environment:
             - LOAD_EX=n
             - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
@@ -95,8 +95,8 @@ services:
             - ./requirements.txt:/requirements.txt
             - ./config:/usr/local/airflow/config
             - ./scripts:/usr/local/airflow/scripts
-            - ./data:/usr/local/data
-            - ./dictionary:/usr/local/dictionary
+            - ./data:/usr/local/airflow/data
+            - ./dictionary:/usr/local/airflow/dictionary
         environment:
             - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
             - EXECUTOR=Celery

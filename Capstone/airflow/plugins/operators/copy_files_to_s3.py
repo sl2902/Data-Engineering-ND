@@ -16,10 +16,10 @@ class CopyFilesToS3Operator(BaseOperator):
     
     @apply_defaults
     def __init__(self, aws_credentials, 
-                 source_path,
-                 file_ext, 
+                 source_path, 
                  s3_bucket, 
                  s3_key,
+                 file_ext=None,
                  src_files=None,
                  *args,
                  **kwargs):
@@ -52,8 +52,15 @@ class CopyFilesToS3Operator(BaseOperator):
                             s3_hook.load_file(os.path.join(path, _file), os.path.join(self.s3_key, _file), 
                                         bucket_name=self.s3_bucket, replace=True)
                             self.log.info(f'Copied file {_file} into S3 bucket...')
+                        else:
+                            # default option caters to files with any extension
+                            # useful when the transformed output may have different formats
+                            if _file == '.DS_Store': continue
+                            s3_hook.load_file(os.path.join(path, _file), os.path.join(self.s3_key, path.split('/')[-1], _file), 
+                                        bucket_name=self.s3_bucket, replace=True)
+                            self.log.info(f'Copied file {_file} into S3 bucket...')
                         # else:
                         #     self.log.info(f"File {_file} doesn't end with extension {self.file_ext}")
             except Exception as e:
-                self.log.warn(f'Failed to copy {_file} into S3 bucket...')
+                self.log.error(f'Failed to copy {_file} into S3 bucket...')
             

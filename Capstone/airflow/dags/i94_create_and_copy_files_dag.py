@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
+import datetime
 import os
 from airflow import DAG
 from airflow.operators.dummy_operator import DummyOperator
@@ -15,8 +16,8 @@ parser = configparser.ConfigParser()
 # f = os.path.relpath('/Users/home/Documents/dend/Data-Engineering-ND/Capstone/config/etl_config.cfg', cfg_rel_path)
 # print(f)
 try:
-    parser.read('config/etl_config.cfg')
-    # parser.read(os.path.join(os.path.abspath('config'), 'etl_config.cfg'))
+    # parser.read('config/etl_config.cfg')
+    parser.read('/Users/home/Documents/dend/Data-Engineering-ND/Capstone/config/etl_config.cfg')
 except Exception as e:
     print('Cannot find etl_config.cfg file...')
     self.log.error('Cannot find etl_config.cfg file...')
@@ -43,7 +44,7 @@ s3_dict_key = parser['S3']['s3_dict_key']
 
 default_args = {
     'owner': 'god',
-    'start_date': datetime(2021, 4, 27),
+    'start_date': datetime.datetime.combine(datetime.datetime.today(), datetime.time(0, 0)) - timedelta(days=1), #datetime.datetime(2021, 4, 30),
     'depends_on_past': False,
     'retries': 3,
     'retry_delay': timedelta(minutes=5),
