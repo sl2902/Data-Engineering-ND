@@ -41,8 +41,6 @@ The data can also be mashed with the U.S. census data to study the impact on the
 # Data model
 The model architected to support this data source is a snowflake schema; this is a multidimensional model, which has its own fact table along with dimension tables having their own sub-dimensions. The model supports both normalization and denormalization, and it takes up less space relative to the star schema. On the flip side, the queries might be a tad more complex.
 
-![image](https://user-images.githubusercontent.com/7212518/117299326-078de800-ae96-11eb-8984-a3fd40dfab01.png)
-
 There are 3 main sources of data; the I94 immigrations dataset, including the dictionary produces the following tables:
 ### Dimension tables
 - `i94_immigrations` - A dimension table that contains details about the immigration checkpoint.
@@ -130,13 +128,70 @@ login - Your aws access key id, password secret access key, and save them.
 
 The above steps can be abstracted away if Docker is used. However, I ran into dependency issues inside Amazon EMR, and had to backtrack.
 
-Edit the following entries in teh `etl_config.cfg` script:
+Git clone the repo `https://github.com/sl2902/Data-Engineering-ND.git`. `cd Capstone`
+
+The directory structure should look like so:
+
+Capstone
+    ├── Dockerfile
+    ├── README.md
+    ├── airflow
+    │   ├── dags
+    │   │   ├── __init__.py
+    │   │   ├── i94_create_and_copy_files_dag.py
+    │   │   └── i94_run_etl_dag.py
+    │   └── plugins
+    │       ├── __init__.py
+    │       └── operators
+    │           ├── __init__.py
+    │           ├── copy_files_to_s3.py
+    │           └── create_s3_bucket.py
+    ├── config
+    │   ├── __init__.py
+    │   ├── airflow.cfg
+    │   └── etl_config.cfg
+    ├── data
+    │   └── 18-83510-I94-Data-2016
+    │       ├── i94_apr16_sub.sas7bdat
+    │       ├── i94_aug16_sub.sas7bdat
+    │       ├── i94_dec16_sub.sas7bdat
+    │       ├── i94_feb16_sub.sas7bdat
+    │       ├── i94_jan16_sub.sas7bdat
+    │       ├── i94_jul16_sub.sas7bdat
+    │       ├── i94_jun16_sub.sas7bdat
+    │       ├── i94_mar16_sub.sas7bdat
+    │       ├── i94_may16_sub.sas7bdat
+    │       ├── i94_nov16_sub.sas7bdat
+    │       ├── i94_oct16_sub.sas7bdat
+    │       └── i94_sep16_sub.sas7bdat
+    ├── dictionary
+    │   └── I94_SAS_Labels_Descriptions.SAS
+    ├── docker-compose-CeleryExecutor.yml
+    ├── notebook
+    │   ├── Capstone\ Project\ Template.ipynb
+    │   ├── Explore_using_PySpark.ipynb
+    │   └── misc_function_testing.ipynb
+    ├── requirements.txt
+    ├── script
+    │   └── entrypoint.sh
+    └── scripts
+        ├── etl.py
+        ├── i94_data_quality_check.py
+
+The files and folders of interest are:
+- airflow - contains the dags and plugins
+- config - contains the configuration script
+- data - contains the SAS datasets including the CSV files
+- dictionary - contains the data dictionary
+- scripts - contains the ETL pipeline scripts
+
+Edit the following entries in the `etl_config.cfg` script:
 - Under section S3 - s3_bucket
 - Under section LOCAL - input_files, which is a list. Here you can list out the files you want processed.
 - Under section APP - sas_jar_ver
 - Under section DQ - tables and table_col
 
-From the Airflow UI, toggle the switch from OFF to ON, and refresh your page. You should see the dag start.
+Start the Airflow server. From the Airflow UI, toggle the switch from OFF to ON, and refresh your page. You should see the dag start.
 ![image](https://user-images.githubusercontent.com/7212518/117315961-c9002980-aea5-11eb-9bdf-30d259ca829f.png)
 
 The scripts can be tested locally as well, like so
@@ -145,7 +200,6 @@ Run
 python etl.py
 python i94_data_quality_check.py --tables='["i94_visa", "i94_travel_mode"]' --table-col='{"i94_visa": ["visa_id"], "i94_travel_mode": ["mode_id"]}'
 ```
-
 
 
 
