@@ -43,7 +43,10 @@ scripts_dir = os.path.join(base_dir, scripts_dir)
 sas_jar_ver = parser['APP']['sas_jar_ver']
 sas_jar_key = parser['APP']['jar_dir']
 
-# config_dir = os.path.join(base_dir, config_dir)
+config_dir = parser['LOCAL']['config_dir']
+# scripts_dir = parser['DOCKER']['scripts_dir']
+
+config_dir = os.path.join(base_dir, config_dir)
 # scripts_dir = os.path.join(base_dir, scripts_dir)
 
 s3_bucket = parser['S3']['s3_bucket']
@@ -222,15 +225,15 @@ with DAG(
         #     s3_key=s3_scripts_key,
         # )
 
-        # copy_config = CopyFilesToS3Operator(
-        #     task_id='Copy_config_files_to_s3',
-        #     dag=dag,
-        #     aws_credentials='aws_credentials',
-        #     source_path=config_dir,
-        #     file_ext='cfg',
-        #     s3_bucket=s3_bucket,
-        #     s3_key=s3_config_key,
-        # )
+        copy_config = CopyFilesToS3Operator(
+            task_id='Copy_config_files_to_s3',
+            dag=dag,
+            aws_credentials='aws_credentials',
+            source_path=config_dir,
+            file_ext='cfg',
+            s3_bucket=s3_bucket,
+            s3_key=s3_config_key,
+        )
 
         copy_output = CopyFilesToS3Operator(
             task_id='Copy_output_to_s3',
@@ -256,12 +259,14 @@ with DAG(
             task_id='Execute_data_quality_script',
             dag=dag,
             bash_command='python {{ params.scripts_dir }}/i94_data_quality_check.py --env=s3 \
-                                                --aws_access_key_id={{ params.access_key_id }} \
-                                                --aws_secret_access_key={{ params.secret_access_key }} \
+                                                --bucket-name={{ params.bucket_name }} \
+                                                --aws-access-key-id={{ params.access_key_id }} \
+                                                --aws-secret-access-key={{ params.secret_access_key }} \
                                                 --tables={{ params.check_tables }} \
                                                 --table-col={{ params.table_col }}',
             params = {
                         'scripts_dir': scripts_dir,
+                        'bucket_name': s3_bucket,
                         'access_key_id': AWS_ACCESS_KEY_ID,
                         'secret_access_key': AWS_SECRET_ACCESS_KEY,
                         'check_tables': tables,
@@ -345,7 +350,7 @@ with DAG(
 
         end_operator = DummyOperator(task_id='End_execution', dag=dag)
 
-        start_operator >> run_etl_script >> copy_output  >> run_dq_script >> copy_log >> end_operator
+        start_operator >> run_etl_script >> copy_config >> copy_output  >> run_dq_script >> copy_log >> end_operator
 
         # start_operator >> [copy_scripts, copy_config]
 

@@ -184,10 +184,13 @@ def i94_trips(spark, df):
     Returns - A cleaned fact DataFrame
     """
     try:
+        df = df.dropDuplicates()
+        df = df.withColumn('trip_id', F.monotonically_increasing_id())
         df.createOrReplaceTempView('i94_trips')
         trips = spark.sql("""
             SELECT
                 DISTINCT
+                STRING(trip_id) AS trip_id,
                 STRING(INT(cicid)) AS custom_client_id,
                 STRING(INT(admnum)) AS admissions_number,
                 INT(i94yr) AS i94_year,
@@ -223,6 +226,7 @@ def i94_visitors(spark, df):
                 STRING(INT(admnum)) AS admissions_number,
                 INT(i94yr) AS i94_year,
                 INT(i94mon) AS i94_month,
+                occup AS occupation,
                 STRING(INT(i94res)) AS resident_country_id,
                 INT(biryear) AS birth_year,
                 gender
@@ -415,14 +419,14 @@ def write_dataframes(df, output_file,
             if is_partition:
                 if is_overwrite:
                     (
-                        df.write.option('header', 'False')
+                        df.write.option('header', 'True')
                                     .mode('overwrite')
                                     .partitionBy('i94_year', 'i94_month')
                                     .parquet(output_file)
                     )
                 else:
                     (
-                        df.write.option('header', 'False')
+                        df.write.option('header', 'True')
                                     .mode('append')
                                     .partitionBy('i94_year', 'i94_month')
                                     .parquet(output_file)
@@ -430,13 +434,13 @@ def write_dataframes(df, output_file,
             else:
                 if is_overwrite:
                     (
-                        df.write.option('header', 'False')
+                        df.write.option('header', 'True')
                                     .mode('overwrite')
                                     .parquet(output_file)
                     )
                 else:
                     (
-                        df.write.option('header', 'False')
+                        df.write.option('header', 'True')
                                     .mode('append')
                                     .parquet(output_file)
                     )
@@ -444,14 +448,14 @@ def write_dataframes(df, output_file,
             if is_partition:
                 if is_overwrite:
                     (
-                        df.write.option('header', 'False')
+                        df.write.option('header', 'True')
                                     .mode('overwrite')
                                     .partitionBy('i94_year', 'i94_month')
                                     .csv(output_file)
                     )
                 else:
                     (
-                        df.write.option('header', 'False')
+                        df.write.option('header', 'True')
                                     .mode('append')
                                     .partitionBy('i94_year', 'i94_month')
                                     .csv(output_file)
@@ -459,13 +463,13 @@ def write_dataframes(df, output_file,
             else:
                 if is_overwrite:
                     (
-                        df.write.option('header', 'False')
+                        df.write.option('header', 'True')
                                 .mode('overwrite')
                                 .csv(output_file)
                     )
                 else:
                     (
-                        df.write.option('header', 'False')
+                        df.write.option('header', 'True')
                                     .mode('append')
                                     .csv(output_file)
                     )

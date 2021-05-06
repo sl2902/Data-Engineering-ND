@@ -97,9 +97,13 @@ def check_null_columns(spark, df, cols):
     null_cols_list = []
     # this assumes the col list matches the original schema
     # df = df.toDF(*cols)
-    df = df.select(*cols)
-    col_null_count = df.select([F.count(F.when(F.isnan(col) | F.col(col).isNull(), col)).alias(col) for col in cols]).toPandas().to_dict()
-    null_cols_list = [k for k, v in col_null_count.items() if v[0] > 0]
+    try:
+        df = df.select(*cols)
+        col_null_count = df.select([F.count(F.when(F.isnan(col) | F.col(col).isNull(), col)).alias(col) for col in cols]).toPandas().to_dict()
+        null_cols_list = [k for k, v in col_null_count.items() if v[0] > 0]
+    except Exception as e:
+        logger.error('Probably and invalid column(s) was passed...')
+        return ['failed']
     return null_cols_list
 
 def enable_logging(log_dir, log_file):
@@ -143,9 +147,11 @@ def main():
                                 args['aws_access_key_id'] and
                                 args['aws_secret_access_key']):
         parser.error('Specify a bucket, access key and secret access key...')
+        raise
     # print(args)
     # print(args['env'])
     # print(args['subcommand'])
+
 
     if args['env'] == 'S3':
         s3_client = create_client(
@@ -156,6 +162,7 @@ def main():
                     )
         os.environ['AWS_ACCESS_KEY_ID'] = args['aws_access_key_id'].strip()
         os.environ['AWS_SECRET_ACCESS_KEY'] = args['aws_secret_access_key'].strip()
+
 
     tables = args['tables']
     table_col_dict = args['table_col']
@@ -225,12 +232,11 @@ def main():
     valid_tables = []
     if args['env'] == 'S3':
         for table in tables:
-            try:
-                s3_client.Object(Bucket=bucket, Key=os.path.join(output_dir, table)).load()
+            res = s3_client.list_objects(Bucket=bucket, Prefix=os.path.join(output_dir, table))
+            if 'Contents' in res:
                 valid_tables.append(table)
-            except Exception as e:
+            else:
                 logger.error(f'Table {table} is invalid...')
-                logger.error(e)
     else:
         for table in tables:
             try:
@@ -250,10 +256,10 @@ def main():
     if len(valid_tables) > 0:
         for table in tables:
             try:
-                df = spark.read.parquet(os.path.join(output_dir, table))
+                df = spark.read.parquet(os.path.join(output_dir, table), header=True)
                 logger.info(f'Table {table} being checked is a parquet table')
             except:
-                df = spark.read.csv(os.path.join(output_dir, table))
+                df = spark.read.csv(os.path.join(output_dir, table), header=True)
                 logger.info(f'Table {table} being checked is a csv table...')
             if check_empty_table(spark, df) == 0:
                 logger.error(f'Table {table} has empty rows...')
@@ -266,12 +272,14 @@ def main():
     if len(valid_table_cols) > 0:
         for table, col_list in table_col_dict.items():
             try:
-                df = spark.read.parquet(os.path.join(output_dir, table), header=False)
+                df = spark.read.parquet(os.path.join(output_dir, table), header=True)
                 logger.info(f'Table {table} being checked is a parquet table')
             except:
-                df = spark.read.csv(os.path.join(output_dir, table), header=False)
+                df = spark.read.csv(os.path.join(output_dir, table), header=True)
                 logger.info(f'Table {table} being checked is a csv table...')
-            if len(check_null_columns(spark, df, col_list)) > 0:
+            if len(check_null_columns(spark, df, col_list)) != 0 and check_null_columns(spark, df, col_list)[0] == 'failed':
+                logger.error('The null column check failed possibly due to invalid column selection...')
+            elif len(check_null_columns(spark, df, col_list)) > 0: 
                 logger.info(f'Columns with nulls {col_list}')
                 logger.error(f'Table {table} has columns with null values...')
             else:
