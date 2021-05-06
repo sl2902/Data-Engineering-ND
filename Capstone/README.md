@@ -80,22 +80,21 @@ This Proof of Concept was built and tested on Mac OS Catalina 10.15.5
 - Installed version of JRE - 1.8.0_281
 - Installed Pyspark version - 3.1.1
 
-- Create an environment by running the following command on the terminal
-`conda create --name capstone python=3.6`
-- `pip install pyspark`
-- `pip install apache-airflow`
+- Create an environment by running the following commands on the terminal
+                `conda create --name capstone python=3.6`
+-               `pip install pyspark`
+-               `pip install apache-airflow`
 - You may need to install extras to support Amazon Web Services.
 - Once Apache is successfully installed, do the following:
-- `export AIRFLOW_HOME = ~/airflow`
-- `Create a database in postgres called airflow with airflow being both the user and password
--  Go the `~/airflow` and edit the following entries in the `airflow.cfg` file:
--       `dags_folder` - Point it to where the dags are located
--       `plugins_folder` - Point it to where the plugins are located
--       `sql_alchemy_conn` - Set it to the following: postgresql+psycopg2://airflow:airflow@127.0.0.1:5432/airflow. SQLlite doesn't support running multiple dags.
--       Run `airflow dbinit` - Initializes the Database
--       Add these lines into a script to start the Airflow scheduler and webserver
--       ```
--       #!/bin/bash
+        `export AIRFLOW_HOME = ~/airflow`
+         Create a database in postgres called airflow with airflow being both the user and password
+         Go the `~/airflow` and edit the following entries in the `airflow.cfg` file:
+        `dags_folder` - Point it to where the dags are located
+        `plugins_folder` - Point it to where the plugins are located
+        `sql_alchemy_conn` - Set it to the following: postgresql+psycopg2://airflow:airflow@127.0.0.1:5432/airflow. SQLlite doesn't support running multiple dags.
+         `airflow dbinit` - Initializes the Database
+- Add these lines into a script to start the Airflow scheduler and webserver
+```     #!/bin/bash
         # Start airflow
         airflow scheduler --daemon
         airflow webserver --daemon -p 8080
