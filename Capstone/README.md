@@ -208,12 +208,15 @@ python i94_data_quality_check.py --tables='["i94_visa", "i94_travel_mode"]' --ta
 
 # Handling future scenarios
 - The data is increased by 100x
+
  This can be easily dealt with by running the jobs on Amazon's EMR cluster; these are designed to handle big data frameworks, which can proecss vast quantities of data. As they are pricey, they can be spun up on demand, run to execute the task, and terminated on completion. As the final results are stored in S3, there is no loss, and S3 can handle almost infinite storage.
 
 - The pipelines would be run on a daily basis by 7 am every day
+
 Change the `schedule_interval = 0 7 0 0 0`
 
 - The database needed to be accessed by 100+ people
+
 Currently the data is stored in S3. Should a need arise where users would like to build dashboards on top of the data. Amazon offers Redshift - a scalable cloud warehouse to handle huge volumes of data, including users.
 
 
