@@ -130,7 +130,7 @@ login - Your aws access key id, password secret access key, and save them.
 
 The above steps can be abstracted away if Docker is used. However, I ran into dependency issues inside Amazon EMR, and had to backtrack.
 
-Git clone the repo `https://github.com/sl2902/Data-Engineering-ND.git`. `cd Capstone`
+Git clone the repo `git clone https://github.com/sl2902/Data-Engineering-ND.git`. Change the working directory - `cd Capstone`
 
 The directory structure should look like so:
 ```
@@ -194,16 +194,27 @@ Edit the following entries in the `etl_config.cfg` script:
 - Under section APP - sas_jar_ver
 - Under section DQ - tables and table_col
 
-Start the Airflow server. From the Airflow UI, toggle the switch from OFF to ON, and refresh your page. You should see the dag start.
+Start the Airflow server. From the Airflow UI, toggle the switch from OFF to ON, and refresh your page. You should see the dag start
+and finish to completion.
 ![image](https://user-images.githubusercontent.com/7212518/117315961-c9002980-aea5-11eb-9bdf-30d259ca829f.png)
 
-The scripts can be tested locally as well, like so
+The scripts can be tested locally as well, like so:
+
 Run
 ```
 python etl.py
 python i94_data_quality_check.py --tables='["i94_visa", "i94_travel_mode"]' --table-col='{"i94_visa": ["visa_id"], "i94_travel_mode": ["mode_id"]}'
 ```
 
+# Handling future scenarios
+- The data is increased by 100x
+ This can be easily dealt with by running the jobs on Amazon's EMR cluster; these are designed to handle big data frameworks, which can proecss vast quantities of data. As they are pricey, they can be spun up on demand, run to execute the task, and terminated on completion. As the final results are stored in S3, there is no loss, and S3 can handle almost infinite storage.
+
+- The pipelines would be run on a daily basis by 7 am every day
+Change the `schedule_interval = 0 7 0 0 0`
+
+- The database needed to be accessed by 100+ people
+Currently the data is stored in S3. Should a need arise where users would like to build dashboards on top of the data. Amazon offers Redshift - a scalable cloud warehouse to handle huge volumes of data, including users.
 
 
 
