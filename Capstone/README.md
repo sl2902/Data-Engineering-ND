@@ -189,6 +189,7 @@ The files and folders of interest are:
 - scripts - contains the ETL pipeline scripts
 
 Edit the following entries in the `etl_config.cfg` script:
+- Under section AWS - aws_region
 - Under section S3 - s3_bucket
 - Under section LOCAL - input_files, which is a list. Here you can list out the files you want processed.
 - Under section APP - sas_jar_ver
