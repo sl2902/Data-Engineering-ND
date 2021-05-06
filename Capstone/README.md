@@ -32,7 +32,8 @@ As the data is dated, the analysis coming out of it, at best will give you a pic
 The data can also be mashed with the U.S. census data to study the impact on the accuracy of the Census numbers.
 
 ## Technologies used
-![image](https://user-images.githubusercontent.com/7212518/117294794-b0d1df80-ae90-11eb-8e53-e617a01cb67c.png)
+![image](https://user-images.githubusercontent.com/7212518/117294794-b0d1df80-ae90-11eb-8e53-e617a01cb67c.png) ![image](https://user-images.githubusercontent.com/7212518/117294934-dced6080-ae90-11eb-908d-36abdf7b994b.png)
+
 
 
 
