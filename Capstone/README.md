@@ -17,16 +17,23 @@ This data comes from the US Census Bureau's 2015 American Community Survey. Here
 This is a simple table of airport codes and corresponding cities. It comes from [DataHub](https://datahub.io/core/airport-codes#data)
 
 # Purpose of the data
-As the data is dated, the analysis coming out of it, at best will give you a picture of the immigration trends in 2016. However, the end-usesrs can purchase year on year data, to help answer some pertinent question, which can help several institutions aside from the Immigrations:
+As the data is dated, the analysis coming out of it, at best will give you a picture of the immigration trends in 2016. However, the end-usesrs can purchase year on year data, to help answer some pertinent question, which can help several institutions aside from the Immigrations authorities with planning and execution of various projects:
 1) What does the immigrations trend look like? What is the yearly growth rate?
 2) Which countries see the vast majority of visitors flowing into the U.S. yearly?
 3) Which cities receives the majority of these visitors yearly?
 4) What is the favourite mode of transportation? Do some visitors prefer a more obvious mode given geographical closeness?
-5) Which months are generally preferred?
+5) Which months are generally preferred for visits?
 6) WHich visa type is the most popular?
-7) What is Age/ Work demographics of the travelers?
+7) What is Age/Work/Gender demographics of the travelers?
 8) What is the purpose of their visit?
 9) On average, what is the duration of stay?
+10) Which airports are the busiest during the year?
+
+The data can also be mashed with the U.S. census data to study the impact on the accuracy of the Census numbers.
+
+## Technologies used
+![image](https://user-images.githubusercontent.com/7212518/117294794-b0d1df80-ae90-11eb-8e53-e617a01cb67c.png)
+
 
 
 ## Credits
