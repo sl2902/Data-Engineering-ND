@@ -123,7 +123,23 @@ done
 - Move the dag back into its original location
 - Run the script to start the server
 - The Airflow UI can be accessed from `http://localhost:8080`
-- 
+- Inside the UI, go to Admin -> Connections. Here enter the AWS credentials, namely the connection id - aws_credentials, conn_type - Amazon Web Services
+login - Your aws access key id, password secret access key, and save them.
+
+The above steps can be abstracted away if Docker is used. However, I ran into dependency issues inside Amazon EMR, and had to backtrack.
+
+Edit the following entries in teh `etl_config.cfg` script:
+- Under section S3 - s3_bucket
+- Under section LOCAL - input_files, which is a list. Here you can list out the files you want processed.
+- Under section APP - sas_jar_ver
+- Under section DQ - tables and table_col
+
+From the Airflow UI, toggle the switch from OFF to ON, and refresh your page. You should see the dag start.
+![image](https://user-images.githubusercontent.com/7212518/117315961-c9002980-aea5-11eb-9bdf-30d259ca829f.png)
+
+
+
+
 
 
 
