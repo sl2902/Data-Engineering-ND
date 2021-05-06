@@ -43,11 +43,28 @@ The model architected to support this data source is a snowflake schema; this is
 
 ![image](https://user-images.githubusercontent.com/7212518/117299326-078de800-ae96-11eb-8984-a3fd40dfab01.png)
 
-There are 3 main sources of data; the I94 immigrations produces the following tables:
+There are 3 main sources of data; the I94 immigrations dataset, including the dictionary produces the following tables:
 ### Dimension tables
 - `i94_immigrations` - A dimension table that contains details about the immigration checkpoint.
 - `i94_port_state_mapping` - A table mapping the port id to its respective location.
 - `i94_travel_mode` - A table capturing the various modes of travel.
+- `i94_dates` - A derived table using arrival_date. It captures various dimensions of a data attribute.
+- `i94_visitors` - A table that shows the demographic details about the visitor.
+- `i94_flights` - A table capturing the flight information.
+- `i94_countries` - A table capturing countries.
+- `i94_visa` - This table shows the various categories of visas offered.
+- `i94_state_mapping` - A table showing U.S. State information.
+### Fact table
+- `i94_trips` - Captures the visits made by the individual during the year.
+
+From the U.S. cities demograhic dataset,t he following tables were produced:
+### Dimension tables
+- `i94_us_states_demograhic` - Captures census count by state.
+- `i94_us_cities_demographic` - Captures city-wise population count. Also include race.
+
+Finally, the airports dataset captures:
+### Dimension table
+- `i94_airports` - Location and type of the airport.
 
 
 
