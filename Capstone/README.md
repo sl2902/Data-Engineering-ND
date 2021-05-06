@@ -6,7 +6,15 @@ The data provided for this project is from the US I94 Immigrations 2016 time per
 The analysis of such data along with additional sources such as the US census demographic data can help Immigrations officials better deal with the influx of visitors thronging their country every day.
 
 # Data sources
-## 1 U.S. I94 Immigrations data 2016
+## 1. U.S. I94 immigrations data 2016
+This is the main data source, and it has 12 files - one for each month of the year; the files are stored in sas7bdat format, and each file has roughly 3-4 million records for a total size of ~6GB. The data comes from here - th, e [US National Tourism and Trade Office](https://travel.trade.gov/research/reports/i94/historical/2016.html). A data dictionary is also provided to supplement these data.
+
+## 2. U.S. Cities demographics 2015
+This dataset contains information about the demographics of all US cities and census-designated places with a population greater or equal to 65,000. 
+This data comes from the US Census Bureau's 2015 American Community Survey. Here is the source [OpendDataSoft](https://public.opendatasoft.com/explore/dataset/us-cities-demographics/information/)
+
+## 3. Airport codes
+This is a simple table of airport codes and corresponding cities. It comes from (DataHub)[https://datahub.io/core/airport-codes#data]
 
 ## Credits
 Docker airflow
