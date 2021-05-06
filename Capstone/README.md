@@ -68,7 +68,9 @@ Finally, the airports dataset captures:
 
 # Jobs description
 - The ETL script will read the datasets from the local drive and create the required tables, and store them as Parquet/CSV files into an S3 bucket in their appropriate folders.
+- It copies the config file and transformed datasets for the next job.
 - The Data quality check job will check for empty records and also check for null keys.
+- The logs are finally copied into an S3 folder.
 - The orchestration is handled in Airflow.
 
 # How to run
@@ -136,6 +138,13 @@ Edit the following entries in teh `etl_config.cfg` script:
 
 From the Airflow UI, toggle the switch from OFF to ON, and refresh your page. You should see the dag start.
 ![image](https://user-images.githubusercontent.com/7212518/117315961-c9002980-aea5-11eb-9bdf-30d259ca829f.png)
+
+The scripts can be tested locally as well, like so
+Run
+```
+python etl.py
+python i94_data_quality_check.py --tables='["i94_visa", "i94_travel_mode"]' --table-col='{"i94_visa": ["visa_id"], "i94_travel_mode": ["mode_id"]}'
+```
 
 
 
