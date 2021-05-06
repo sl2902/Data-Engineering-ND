@@ -38,6 +38,11 @@ The data can also be mashed with the U.S. census data to study the impact on the
 - PySpark is an interface for Apache Spark in Python. All the heavy lifting is managed by Pyspark APIs as it offers in-memory computing capabilities.
 - AWS S3 - Amazon S3 or Amazon Simple Storage Service is a service offered by Amazon Web Services that provides object storage through a web service interface.
 
+# Data model
+The model architected to support this data source is a snowflake schema; this is a multidimensional model, which has its own fact table along with dimension tables having their own sub-dimensions. The model supports both normalization and denormalization, and it takes up less space relative to the star schema. On the flip side, the queries might be a tad more complex.
+
+![image](https://user-images.githubusercontent.com/7212518/117299326-078de800-ae96-11eb-8984-a3fd40dfab01.png)
+
 
 
 
