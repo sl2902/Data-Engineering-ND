@@ -88,15 +88,15 @@ This Proof of Concept was built and tested on Mac OS Catalina 10.15.5
 ```
 - You may need to install extras to support Amazon Web Services.
 - Once Apache is successfully installed, do the following:
-  ```
-  export AIRFLOW_HOME = ~/airflow
-  Create a database in postgres called airflow with airflow being both the user and password
-  Go the ~/airflow and edit the following entries in the `airflow.cfg` file:
-  dags_folder` - Point it to where the dags are located
-  plugins_folder` - Point it to where the plugins are located
-  sql_alchemy_conn` - Set it to the following: postgresql+psycopg2://airflow:airflow@127.0.0.1:5432/airflow. SQLlite doesn't support running multiple dags.
-  airflow dbinit - Initializes the Database
-  ```
+```
+- export AIRFLOW_HOME = ~/airflow
+- Create a database in postgres called airflow with airflow being both the user and password
+- Go the ~/airflow and edit the following entries in the airflow.cfg file:
+- dags_folder - Point it to where the dags are located
+- plugins_folder - Point it to where the plugins are located
+- sql_alchemy_conn - Set it to the following: postgresql+psycopg2://airflow:airflow@127.0.0.1:5432/airflow. SQLlite doesn't support running multiple dags.
+- airflow dbinit - Initializes the Database
+```
 - Add these lines into a script to start the Airflow scheduler and webserver
 ```
 #!/bin/bash
@@ -116,6 +116,14 @@ while true; do
   fi
 done
 ```
+- To stop the Airflow server, run `cat $AIRFLOW_HOME/airflow-webserver.pid | xargs kill -9`
+- I have noticed that deleting a dag from UI doesn't delete it at all. So, you have to do so from the command line, as follows:
+- Temporarily Move the offending dag from its location into another location
+- Run `airflow delete_dag i94_run_etl`
+- Move the dag back into its original location
+- Run the script to start the server
+- The Airflow UI can be accessed from `http://localhost:8080`
+- 
 
 
 
