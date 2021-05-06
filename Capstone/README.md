@@ -66,6 +66,53 @@ Finally, the airports dataset captures:
 ### Dimension table
 - `i94_airports` - Location and type of the airport.
 
+# Jobs description
+- The ETL script will read the datasets from the local drive and create the required tables, and store them as Parquet/CSV files into an S3 bucket in their appropriate folders.
+- The Data quality check job will check for empty records and also check for null keys.
+- The orchestration is handled in Airflow.
+
+# How to run
+This Proof of Concept was built and tested on Mac OS Catalina 10.15.5
+- Installed version of Airflow - 1.10.2
+- Installed version of Python - 3.6.13
+- Installed version of psycopg2 - 2.8.6
+- Installed version of PostgreSQL - 13.2
+- Installed version of JRE - 1.8.0_281
+- Installed Pyspark version - 3.1.1
+
+- Create an environment by running the following command on the terminal
+`conda create --name capstone python=3.6`
+- `pip install pyspark`
+- `pip install apache-airflow`
+- You may need to install extras to support Amazon Web Services.
+- Once Apache is successfully installed, do the following:
+- `export AIRFLOW_HOME = ~/airflow`
+- `Create a database in postgres called airflow with airflow being both the user and password
+-  Go the `~/airflow` and edit the following entries in the `airflow.cfg` file:
+-       `dags_folder` - Point it to where the dags are located
+-       `plugins_folder` - Point it to where the plugins are located
+-       `sql_alchemy_conn` - Set it to the following: postgresql+psycopg2://airflow:airflow@127.0.0.1:5432/airflow. SQLlite doesn't support running multiple dags.
+-       Run `airflow dbinit` - Initializes the Database
+-       Add these lines into a script to start the Airflow scheduler and webserver
+-       ```
+-       #!/bin/bash
+        # Start airflow
+        airflow scheduler --daemon
+        airflow webserver --daemon -p 8080
+
+        # Wait till airflow web-server is ready
+        echo "Waiting for Airflow web server..."
+        while true; do
+          _RUNNING=$(ps aux | grep airflow-webserver | grep ready | wc -l)
+          if [ $_RUNNING -eq 0 ]; then
+            sleep 1
+          else
+            echo "Airflow web server is ready"
+            break;
+          fi
+        done
+```
+
 
 
 
