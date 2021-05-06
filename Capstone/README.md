@@ -34,9 +34,9 @@ The data can also be mashed with the U.S. census data to study the impact on the
 ## Technologies used
 ![image](https://user-images.githubusercontent.com/7212518/117294794-b0d1df80-ae90-11eb-8e53-e617a01cb67c.png) ![image](https://user-images.githubusercontent.com/7212518/117294934-dced6080-ae90-11eb-908d-36abdf7b994b.png)
 
-. Airflow is an open-sourced Directed Acyclic Graph(DAG) based, schedulable, data-pipeline orchestration tool. Developers can build dags using Python, and schedule them; the jobs can be monitored via a user-friendly UI.
-. PySpark is an interface for Apache Spark in Python. All the heavy lifting is managed by Pyspark APIs as it offers in-memory computing capabilities.
-. AWS S3 - Amazon S3 or Amazon Simple Storage Service is a service offered by Amazon Web Services that provides object storage through a web service interface.
+- Airflow is an open-sourced Directed Acyclic Graph(DAG) based, schedulable, data-pipeline orchestration tool. Developers can build dags using Python, and schedule them; the jobs can be monitored via a user-friendly UI.
+- PySpark is an interface for Apache Spark in Python. All the heavy lifting is managed by Pyspark APIs as it offers in-memory computing capabilities.
+- AWS S3 - Amazon S3 or Amazon Simple Storage Service is a service offered by Amazon Web Services that provides object storage through a web service interface.
 
 
 
