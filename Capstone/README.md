@@ -41,6 +41,8 @@ The data can also be mashed with the U.S. census data to study the impact on the
 # Data model
 The model architected to support this data source is a snowflake schema; this is a multidimensional model, which has its own fact table along with dimension tables having their own sub-dimensions. The model supports both normalization and denormalization, and it takes up less space relative to the star schema. On the flip side, the queries might be a tad more complex.
 
+![image](https://user-images.githubusercontent.com/7212518/117299326-078de800-ae96-11eb-8984-a3fd40dfab01.png)
+
 There are 3 main sources of data; the I94 immigrations dataset, including the dictionary produces the following tables:
 ### Dimension tables
 - `i94_immigrations` - A dimension table that contains details about the immigration checkpoint.
@@ -131,7 +133,7 @@ The above steps can be abstracted away if Docker is used. However, I ran into de
 Git clone the repo `https://github.com/sl2902/Data-Engineering-ND.git`. `cd Capstone`
 
 The directory structure should look like so:
-
+```
 Capstone
     ├── Dockerfile
     ├── README.md
@@ -177,6 +179,7 @@ Capstone
     └── scripts
         ├── etl.py
         ├── i94_data_quality_check.py
+```
 
 The files and folders of interest are:
 - airflow - contains the dags and plugins
