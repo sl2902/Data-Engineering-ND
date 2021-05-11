@@ -199,7 +199,12 @@ Edit the following entries in the `etl_config.cfg` script:
 
 Start the Airflow server. From the Airflow UI, toggle the switch from OFF to ON, and refresh your page. You should see the dag start
 and finish to completion.
-![image](https://user-images.githubusercontent.com/7212518/117315961-c9002980-aea5-11eb-9bdf-30d259ca829f.png)
+First scenario - Create S3 bucket
+Screenshot 2021-05-11 at 4.15.22 PM![image](https://user-images.githubusercontent.com/7212518/117806162-8bb9e400-b277-11eb-970e-2bd49fc7e712.png)
+
+Second scenario - S3 bucket exists
+Screenshot 2021-05-11 at 4.34.44 PM![image](https://user-images.githubusercontent.com/7212518/117806208-9d9b8700-b277-11eb-9647-6f0c2227c360.png)
+
 
 The scripts can be tested locally as well, like so:
 
@@ -231,3 +236,6 @@ Currently the data is stored in S3. Should a need arise where users would like t
 ## Credits
 Docker airflow
 https://github.com/puckel/docker-airflow
+
+Airflow
+https://github.com/puckel/docker-airflow/issues/301
