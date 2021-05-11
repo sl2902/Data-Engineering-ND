@@ -53,6 +53,22 @@ def create_client(service, region, access_key_id, secret_access_key):
                           )
     return client
 
+def create_s3_bucket(s3_client, bucket_name, region='us-west-2'):
+    """
+    Create an s3 bucket
+    :params s3_client: An S3 client object
+    :params bucket_name: A unique bucket
+    :params region: A valid AWS region
+    Returns - None
+    """
+    try:
+        s3_client.create_bucket(Bucket=bucket_name,
+                                CreateBucketConfiguration={'LocationConstraint': region})
+    except Exception as e:
+        logger.warn('Bucket creation has failed...')
+        logger.error(e)
+        raise
+
 def create_spark_session():
     """
     Build a Pyspark session
@@ -577,6 +593,7 @@ def main():
     parser.add_argument('--bucket-name', help='Enter S3 bucket')
     parser.add_argument('--aws-access-key-id', help='Enter AWS access key id')
     parser.add_argument('--aws-secret-access-key', help='Enter AWS secrest access key')
+    parser.add_argument('--aws-region', default='us-west-2', help='Enter AWS region')
     # subparser = parser.add_subparsers(dest='subcommand', help='Can choose bucket name if S3 is chosen')
     # parser_bucket = subparser.add_parser('S3')
     # parser_bucket.add_argument('bucket', help='S3 bucket name')
@@ -592,15 +609,24 @@ def main():
     # print(args['env'])
     # print(args['subcommand'])
 
-    if args['env'] == 'S3':
+    if args['env'] == 'S3' and args['aws_region'] != '':
         s3_client = create_client(
                         "s3",
-                        region="us-west-2",
+                        region=args['aws_region'],
                         access_key_id=args['aws_access_key_id'],
                         secret_access_key=args['aws_secret_access_key']
                     )
         os.environ['AWS_ACCESS_KEY_ID'] = args['aws_access_key_id'].strip()
         os.environ['AWS_SECRET_ACCESS_KEY'] = args['aws_secret_access_key'].strip()
+        logger.info('Check to see whether s3 bucket exits...')
+        try:
+            s3.meta.client.head_bucket(Bucket=args['bucket_name'])
+            logger.info(f"S3 bucket {args['bucket_name']} exits...")
+        except Exception as e:
+            logger.warn(f"Bucket {args['bucket_name']} doesn't exist...")
+            logger.info('Creating bucket...')
+            create_s3_bucket(s3_client, args['bucket_name'], args['aws_region'])
+
 
     config = configparser.ConfigParser()
     if args['env'] == 'DOCKER':

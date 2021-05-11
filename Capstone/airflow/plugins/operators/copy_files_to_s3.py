@@ -1,6 +1,7 @@
 from airflow.hooks.S3_hook import S3Hook
 from airflow.models import BaseOperator
 from airflow.utils.decorators import apply_defaults
+import re
 import os
 
 class CopyFilesToS3Operator(BaseOperator):
@@ -37,7 +38,9 @@ class CopyFilesToS3Operator(BaseOperator):
         except Exception as e:
             self.log.error('Invalid AWS credentials...')
             raise
+        pattern = self.source_path.split('/')[-1]
         for path, _, files in os.walk(self.source_path):
+            match = re.search(pattern, path)
             try:
                 for _file in files:
                     if self.src_files is not None:
@@ -56,7 +59,7 @@ class CopyFilesToS3Operator(BaseOperator):
                             # default option caters to files with any extension
                             # useful when the transformed output may have different formats
                             if _file == '.DS_Store': continue
-                            s3_hook.load_file(os.path.join(path, _file), os.path.join(self.s3_key, path.split('/')[-1], _file), 
+                            s3_hook.load_file(os.path.join(path, _file), os.path.join(self.s3_key, path[match.end() + 1:], _file), 
                                         bucket_name=self.s3_bucket, replace=True)
                             self.log.info(f'Copied file {_file} into S3 bucket...')
                         # else:

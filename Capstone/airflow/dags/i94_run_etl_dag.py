@@ -1,12 +1,16 @@
 from datetime import timedelta
 import datetime
 import os
+import boto3
+from botocore.exceptions import ClientError
 from airflow import DAG
 from airflow.operators.dummy_operator import DummyOperator
 from airflow.operators.bash_operator import BashOperator
+from airflow.operators.python_operator import PythonOperator, BranchPythonOperator
 from airflow.hooks.base_hook import BaseHook
 from airflow.operators import (CreateS3BucketOperator, CopyFilesToS3Operator)
 from airflow.operators.postgres_operator import PostgresOperator
+from airflow.utils.trigger_rule import TriggerRule
 from airflow.contrib.operators.emr_create_job_flow_operator import EmrCreateJobFlowOperator
 from airflow.contrib.operators.emr_add_steps_operator import EmrAddStepsOperator 
 from airflow.contrib.sensors.emr_step_sensor import EmrStepSensor 
@@ -200,6 +204,78 @@ SPARK_STEPS = [
     }
 ]
 
+def create_client(service, region, access_key_id, secret_access_key):
+    """
+    Create client to access AWS resource
+    :params service - Any AWS service
+    :params region - AWS specific region
+    :params access_key_id - AWS credential
+    :params secret_access_key - AWS credential
+    Returns - A boto3 client
+    """
+    client = boto3.client(service,
+                          region_name=region,
+                          aws_access_key_id=access_key_id,
+                          aws_secret_access_key=secret_access_key
+                          )
+    return client
+
+def create_s3_resource(service, region, access_key_id, secret_access_key):
+    """
+    Create S3 resource
+    :params service - Any AWS service
+    :params region - AWS specific region
+    :params access_key_id - AWS credential
+    :params secret_access_key - AWS credential
+    Returns - A boto3 resource
+    """
+    s3 = boto3.resource(service, aws_access_key_id=access_key_id,
+                    aws_secret_access_key=secret_access_key,
+                   region_name=region
+    )
+    return s3
+
+def check_bucket_exists(s3_resource, bucket_name, **kwargs):
+    """
+    Check whether bucket exists
+    :params s3_resource- An S3 resource object
+    :params bucket_name - S3 bucket
+    Returns - A boolean
+    """
+    # return ['Copy_config_files_to_s3'] if s3_resource.Bucket(s3_bucket).creation_date is not None else ['Create_S3_bucket', 'Copy_config_files_to_s3']
+    return 'Dummy_task' if s3_resource.Bucket(s3_bucket).creation_date is not None else 'Create_S3_bucket'
+
+def create_s3_bucket(s3_client, bucket_name, region='us-west-2', **kwargs):
+    """
+    Create an s3 bucket
+    :params s3_client - An S3 client object
+    :params bucket_name - A unique bucket
+    :params region - A valid AWS region
+    Returns - None
+    """
+    try:
+        s3_client.create_bucket(Bucket=bucket_name,
+                                CreateBucketConfiguration={'LocationConstraint': region})
+    except ClientError:
+        print('S3 client creation failed...')
+        raise
+    except Exception as e:
+        print('Bucket creation has failed. This is most likely because it already exists...')
+        print(e)
+
+s3_client = create_client(
+                        "s3",
+                        region=aws_region,
+                        access_key_id=AWS_ACCESS_KEY_ID,
+                        secret_access_key=AWS_SECRET_ACCESS_KEY,
+                    )
+s3_resource = create_s3_resource(
+                        "s3",
+                        region=aws_region,
+                        access_key_id=AWS_ACCESS_KEY_ID,
+                        secret_access_key=AWS_SECRET_ACCESS_KEY,
+                    )
+
 with DAG(
         'i94_run_etl',
         default_args=default_args,
@@ -207,13 +283,6 @@ with DAG(
         schedule_interval='@daily'
         ) as dag:
         start_operator = DummyOperator(task_id='Begin_execution',  dag=dag)
-
-        run_etl_script = BashOperator(
-            task_id='Execute_ETL_script',
-            dag=dag,
-            bash_command='python {{ params.scripts_dir }}/etl.py',
-            params = {'scripts_dir': scripts_dir},
-        )
 
         # copy_scripts = CopyFilesToS3Operator(
         #     task_id='Copy_scripts_to_s3',
@@ -225,6 +294,39 @@ with DAG(
         #     s3_key=s3_scripts_key,
         # )
 
+        check_s3_bucket = BranchPythonOperator(
+            task_id='Check_S3_bucket',
+            dag=dag,
+            python_callable=check_bucket_exists,
+            op_kwargs={'s3_resource': s3_resource,
+                    'bucket_name': s3_bucket,
+                    },
+            provide_context=True,
+        )
+
+        create_s3_bucket = PythonOperator(
+            task_id='Create_S3_bucket',
+            dag=dag,
+            python_callable=create_s3_bucket,
+            op_kwargs={'s3_client': s3_client,
+                        'bucket_name': s3_bucket,
+                        'region': aws_region,
+                        },
+            # job_id="{{ task_instance.xcom_pull(check_s3_bucket, key='return_value') }}",
+            provide_context=True,
+        )
+
+        dummy_task = DummyOperator(
+            task_id='Dummy_task',
+            dag=dag
+        )
+
+        one_success = DummyOperator(
+            task_id='one_task_success',
+            dag=dag,
+            trigger_rule=TriggerRule.ONE_SUCCESS,
+        )
+
         copy_config = CopyFilesToS3Operator(
             task_id='Copy_config_files_to_s3',
             dag=dag,
@@ -233,6 +335,17 @@ with DAG(
             file_ext='cfg',
             s3_bucket=s3_bucket,
             s3_key=s3_config_key,
+            # trigger_rule='one_success',
+            # job_id="{{ task_instance.xcom_pull(check_s3_bucket, key='return_value') }}",
+            provide_context=True,
+        )
+
+        run_etl_script = BashOperator(
+            task_id='Execute_ETL_script',
+            dag=dag,
+            bash_command='python {{ params.scripts_dir }}/etl.py',
+            params = {'scripts_dir': scripts_dir},
+            trigger_rule='all_success',
         )
 
         copy_output = CopyFilesToS3Operator(
@@ -350,7 +463,13 @@ with DAG(
 
         end_operator = DummyOperator(task_id='End_execution', dag=dag)
 
-        start_operator >> run_etl_script >> copy_config >> copy_output  >> run_dq_script >> copy_log >> end_operator
+        start_operator >> check_s3_bucket >> [create_s3_bucket, dummy_task]
+        [dummy_task, create_s3_bucket] >> one_success
+        one_success >> copy_config >> run_etl_script >> copy_output  >> run_dq_script >> copy_log >> end_operator
+
+        # create_s3_bucket >> copy_config
+        # copy_config >> copy_output  >> run_dq_script >> copy_log >> end_operator
+        # create_s3_bucket >> copy_config
 
         # start_operator >> [copy_scripts, copy_config]
 
