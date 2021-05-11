@@ -67,11 +67,13 @@ Finally, the airports dataset captures:
 - `i94_airports` - Location and type of the airport.
 
 # Jobs description
+The orchestration is handled in Airflow as follows:
+- The job will check to see whether the S3 bucket is created or not. For the first run, it will create the S3 bucket.
+- It will then proceed to copy the config files.
 - The ETL script will read the datasets from the local drive and create the required tables, and store them as Parquet/CSV files into an S3 bucket in their appropriate folders.
-- It copies the config file and transformed datasets for the next job.
+- The transformed datasets are copied to S3 for the next job.
 - The Data quality check job will check for empty records and also check for null keys.
 - The logs are finally copied into an S3 folder.
-- The orchestration is handled in Airflow.
 
 # How to run
 This Proof of Concept was built and tested on Mac OS Catalina 10.15.5
