@@ -200,10 +200,10 @@ Edit the following entries in the `etl_config.cfg` script:
 Start the Airflow server. From the Airflow UI, toggle the switch from OFF to ON, and refresh your page. You should see the dag start
 and finish to completion.
 
-First scenario
+First scenario -
 Create S3 bucket![image](https://user-images.githubusercontent.com/7212518/117806162-8bb9e400-b277-11eb-970e-2bd49fc7e712.png)
 
-Second scenario
+Second scenario -
 S3 bucket exists![image](https://user-images.githubusercontent.com/7212518/117806208-9d9b8700-b277-11eb-9647-6f0c2227c360.png)
 
 
